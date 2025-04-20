@@ -1,0 +1,19 @@
+# Frontend
+SWE Project Frontend/node_modules/
+SWE Project Frontend/.DS_Store
+SWE Project Frontend/dist/
+SWE Project Frontend/.env
+SWE Project Frontend/npm-debug.log*
+SWE Project Frontend/yarn-debug.log*
+SWE Project Frontend/yarn-error.log*
+SWE Project Frontend/pnpm-debug.log*
+SWE Project Frontend/.idea/
+SWE Project Frontend/.vscode/
+SWE Project Frontend/*.suo
+SWE Project Frontend/*.ntvs*
+SWE Project Frontend/*.njsproj
+SWE Project Frontend/*.sln
+SWE Project Frontend/*.sw?
+
+# Backend
+SWE Project Backend/node_modules/
