@@ -1,0 +1,5 @@
+ClientID
+721285622151-70osfpavqjmolb5su2dm927gf7phj3o0.apps.googleusercontent.com
+
+Client secret
+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
