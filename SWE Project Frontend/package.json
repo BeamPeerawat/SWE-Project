@@ -13,6 +13,9 @@
     "@googleapis/drive": "^11.0.0",
     "axios": "^1.8.4",
     "core-js": "^3.8.3",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "mongoose": "^8.13.2",
     "vue": "^3.2.13",
     "vue-router": "^4.5.0"
   },
