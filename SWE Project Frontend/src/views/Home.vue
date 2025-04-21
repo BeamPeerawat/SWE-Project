@@ -5,7 +5,7 @@
       <div class="hero-content">
         <img src="@/assets/rmuti-logo.png" alt="RMUTI Logo" class="logo" />
         <h1>ยินดีต้อนรับสู่ระบบยื่นคำร้องออนไลน์</h1>
-        <p>มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน วิทยาเขตขอนแก่น</p>
+        <p>มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน วิทยาเขตขอนแก่น555555</p>
         <p v-if="user">ยินดีต้อนรับ: {{ user.email }}</p>
         <router-link to="/request" class="cta-btn">เริ่มยื่นคำร้อง</router-link>
       </div>
