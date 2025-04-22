@@ -7,6 +7,7 @@
         <div class="header-text">
           <h1>คำร้องขอเปิดรายวิชานอกแผนการเรียน (RE.07)</h1>
           <p>มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน วิทยาเขตขอนแก่น</p>
+          <p v-if="user">ผู้ใช้: {{ user.email }}</p>
         </div>
       </div>
       <button class="back-btn" @click="$router.push('/')">
@@ -135,6 +136,7 @@ export default {
   name: 'OpenCoursePage',
   data() {
     return {
+      user: null,
       form: {
         semester: '',
         academicYear: '',
@@ -157,14 +159,38 @@ export default {
       },
     };
   },
+  created() {
+    // ดึงข้อมูลผู้ใช้จาก localStorage
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      this.user = JSON.parse(userData);
+      // ตรวจสอบว่าเป็นอีเมล @rmuti.ac.th
+      if (!this.user.email.endsWith('@rmuti.ac.th')) {
+        alert('กรุณาใช้อีเมลที่ลงท้ายด้วย @rmuti.ac.th');
+        this.$router.push('/login');
+        return;
+      }
+      // กรอกข้อมูลฟอร์มอัตโนมัติ
+      this.form.studentName = this.user.name || '';
+      this.form.email = this.user.email || '';
+      this.form.studentId = this.user.studentId || ''; // สมมติว่ามี studentId ในข้อมูลผู้ใช้
+      this.form.signature = this.user.name || '';
+    } else {
+      // ถ้าไม่ล็อกอิน redirect ไป login
+      alert('กรุณาล็อกอินก่อนยื่นคำร้อง');
+      this.$router.push('/login');
+    }
+  },
   methods: {
     submitForm() {
-      console.log('Form submitted:', this.form);
+      // ส่งข้อมูลไป Backend
+      console.log('Form submitted:', { ...this.form, userId: this.user?._id });
       alert('คำร้องถูกส่งเรียบร้อยแล้ว!');
       this.$router.push('/');
     },
     saveDraft() {
-      console.log('Draft saved:', this.form);
+      // บันทึกแบบร่าง (อาจเก็บใน localStorage หรือ Backend)
+      console.log('Draft saved:', { ...this.form, userId: this.user?._id });
       alert('บันทึกแบบร่างเรียบร้อยแล้ว!');
     },
   },
