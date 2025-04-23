@@ -96,10 +96,17 @@
               </thead>
               <tbody>
                 <tr>
-                  <td><input type="text" v-model="form.courseCode" placeholder="รหัสวิชา" required /></td>
-                  <td><input type="text" v-model="form.courseTitle" placeholder="ชื่อวิชา" required /></td>
+                  <td>
+                    <select v-model="form.courseCode" @change="updateCourseDetails" required>
+                      <option value="" disabled>เลือกวิชา</option>
+                      <option v-for="subject in subjects" :key="subject._id" :value="subject.subjectCode">
+                        {{ subject.subjectCode }}
+                      </option>
+                    </select>
+                  </td>
+                  <td><input type="text" v-model="form.courseTitle" placeholder="ชื่อวิชา" readonly /></td>
                   <td><input type="text" v-model="form.section" placeholder="ตอนเรียน" required /></td>
-                  <td><input type="text" v-model="form.credits" placeholder="หน่วยกิต" required /></td>
+                  <td><input type="text" v-model="form.credits" placeholder="หน่วยกิต" readonly /></td>
                   <td><input type="text" v-model="form.day" placeholder="วัน" required /></td>
                   <td><input type="text" v-model="form.time" placeholder="เวลา" required /></td>
                   <td><input type="text" v-model="form.room" placeholder="ห้อง" required /></td>
@@ -115,8 +122,25 @@
           <div class="form-group">
             <label>เพื่อพิจารณาคำร้องนี้:</label>
             <p>ติดต่อนักศึกษา:</p>
-            <input type="text" v-model="form.contactNumber" placeholder="เบอร์โทรศัพท์" required />
-            <input type="email" v-model="form.email" placeholder="อีเมล" required />
+            <input
+              type="tel"
+              v-model="form.contactNumber"
+              placeholder="เบอร์โทรศัพท์ (10 หลัก)"
+              pattern="[0-9]{10}"
+              maxlength="10"
+              required
+              @input="validateContactNumber"
+            />
+            <span v-if="contactNumberError" class="error-message">{{ contactNumberError }}</span>
+            <input
+              type="email"
+              v-model="form.email"
+              placeholder="อีเมล (ต้องเป็น @rmuti.ac.th)"
+              pattern="[a-zA-Z0-9._%+-]+@rmuti\.ac\.th"
+              required
+              @input="validateEmail"
+            />
+            <span v-if="emailError" class="error-message">{{ emailError }}</span>
           </div>
         </div>
 
@@ -169,6 +193,9 @@ export default {
         email: '',
         signature: '',
       },
+      subjects: [],
+      contactNumberError: '',
+      emailError: '',
     };
   },
   created() {
@@ -185,7 +212,7 @@ export default {
       // กรอกข้อมูลฟอร์มอัตโนมัติ
       this.form.studentName = this.user.name || '';
       this.form.email = this.user.email || '';
-      this.form.studentId = this.user.studentId || ''; // สมมติว่ามี studentId ในข้อมูลผู้ใช้
+      this.form.studentId = this.user.studentId || '';
       this.form.signature = this.user.name || '';
     } else {
       // ถ้าไม่ล็อกอิน redirect ไป login
@@ -193,15 +220,69 @@ export default {
       this.$router.push('/login');
     }
   },
+  mounted() {
+    this.fetchSubjects();
+  },
   methods: {
-    submitForm() {
-      // ส่งข้อมูลไป Backend
-      console.log('Form submitted:', { ...this.form, userId: this.user?._id });
-      alert('คำร้องถูกส่งเรียบร้อยแล้ว!');
-      this.$router.push('/');
+    async fetchSubjects() {
+      try {
+        const response = await this.$axios.get('http://localhost:3000/api/subjects');
+        this.subjects = response.data;
+      } catch (error) {
+        console.error('Error fetching subjects:', error);
+        alert('ไม่สามารถดึงข้อมูลรายวิชาได้');
+      }
+    },
+    updateCourseDetails() {
+      const selectedSubject = this.subjects.find(subject => subject.subjectCode === this.form.courseCode);
+      if (selectedSubject) {
+        this.form.courseTitle = selectedSubject.subjectName;
+        this.form.credits = selectedSubject.credits.toString();
+      } else {
+        this.form.courseTitle = '';
+        this.form.credits = '';
+      }
+    },
+    validateContactNumber() {
+      const contactNumber = this.form.contactNumber;
+      if (!/^\d{10}$/.test(contactNumber)) {
+        this.contactNumberError = 'เบอร์โทรศัพท์ต้องมี 10 หลักและเป็นตัวเลขเท่านั้น';
+      } else {
+        this.contactNumberError = '';
+      }
+    },
+    validateEmail() {
+      const email = this.form.email;
+      if (!email.endsWith('@rmuti.ac.th')) {
+        this.emailError = 'อีเมลต้องลงท้ายด้วย @rmuti.ac.th';
+      } else {
+        this.emailError = '';
+      }
+    },
+    async submitForm() {
+      // ตรวจสอบก่อนส่ง
+      this.validateContactNumber();
+      this.validateEmail();
+
+      if (this.contactNumberError || this.emailError) {
+        alert('กรุณาแก้ไขข้อมูลที่ไม่ถูกต้องก่อนยื่นคำร้อง');
+        return;
+      }
+
+      try {
+        const response = await this.$axios.post('http://localhost:3000/api/addseatrequests', {
+          ...this.form,
+          userId: this.user?._id,
+        });
+        console.log('Form submitted:', response.data);
+        alert('คำร้องถูกส่งและบันทึกเรียบร้อยแล้ว!');
+        this.$router.push('/');
+      } catch (error) {
+        console.error('Error submitting form:', error);
+        alert('เกิดข้อผิดพลาดในการบันทึกคำร้อง: ' + error.response?.data?.message || error.message);
+      }
     },
     saveDraft() {
-      // บันทึกแบบร่าง (อาจเก็บใน localStorage หรือ Backend)
       console.log('Draft saved:', { ...this.form, userId: this.user?._id });
       alert('บันทึกแบบร่างเรียบร้อยแล้ว!');
     },
@@ -372,13 +453,29 @@ export default {
   font-weight: 500;
 }
 
-.course-table input {
+.course-table input,
+.course-table select {
   width: 100%;
   padding: 10px;
   border: 1px solid #ddd;
   border-radius: 5px;
   font-family: 'Kanit', sans-serif;
   font-size: 1rem;
+}
+
+.course-table select {
+  background: #fff;
+}
+
+.course-table select:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 5px rgba(26, 115, 232, 0.3);
+  outline: none;
+}
+
+.course-table input[readonly] {
+  background: #f0f0f0;
+  cursor: not-allowed;
 }
 
 .form-actions {
@@ -418,5 +515,12 @@ export default {
 .draft-btn:hover {
   background: #e08e0b;
   transform: translateY(-2px);
+}
+
+.error-message {
+  color: #d32f2f;
+  font-size: 0.9rem;
+  margin-top: 5px;
+  display: block;
 }
 </style>

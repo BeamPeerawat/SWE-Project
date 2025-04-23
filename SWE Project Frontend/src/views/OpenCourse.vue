@@ -88,9 +88,16 @@
               </thead>
               <tbody>
                 <tr>
-                  <td><input type="text" v-model="form.courseCode" placeholder="รหัสวิชา" required /></td>
-                  <td><input type="text" v-model="form.courseTitle" placeholder="ชื่อวิชา" required /></td>
-                  <td><input type="text" v-model="form.credits" placeholder="หน่วยกิต" required /></td>
+                  <td>
+                    <select v-model="form.courseCode" @change="updateCourseDetails" required>
+                      <option value="" disabled>เลือกรหัสวิชา</option>
+                      <option v-for="course in courses" :key="course._id" :value="course.subjectCode">
+                        {{ course.subjectCode }}
+                      </option>
+                    </select>
+                  </td>
+                  <td><input type="text" v-model="form.courseTitle" placeholder="ชื่อวิชา" readonly /></td>
+                  <td><input type="text" v-model="form.credits" placeholder="หน่วยกิต" readonly /></td>
                 </tr>
               </tbody>
             </table>
@@ -107,8 +114,25 @@
           <div class="form-group">
             <label>เพื่อพิจารณาคำร้องนี้:</label>
             <p>ติดต่อนักศึกษา:</p>
-            <input type="text" v-model="form.contactNumber" placeholder="เบอร์โทรศัพท์" required />
-            <input type="email" v-model="form.email" placeholder="อีเมล" required />
+            <input
+              type="tel"
+              v-model="form.contactNumber"
+              placeholder="เบอร์โทรศัพท์ (10 หลัก)"
+              pattern="[0-9]{10}"
+              maxlength="10"
+              required
+              @input="validateContactNumber"
+            />
+            <span v-if="contactNumberError" class="error-message">{{ contactNumberError }}</span>
+            <input
+              type="email"
+              v-model="form.email"
+              placeholder="อีเมล (ต้องเป็น @rmuti.ac.th)"
+              pattern="[a-zA-Z0-9._%+-]+@rmuti\.ac\.th"
+              required
+              @input="validateEmail"
+            />
+            <span v-if="emailError" class="error-message">{{ emailError }}</span>
           </div>
         </div>
 
@@ -132,6 +156,8 @@
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   name: 'OpenCoursePage',
   data() {
@@ -157,6 +183,9 @@ export default {
         email: '',
         signature: '',
       },
+      courses: [],
+      contactNumberError: '',
+      emailError: '',
     };
   },
   created() {
@@ -173,7 +202,7 @@ export default {
       // กรอกข้อมูลฟอร์มอัตโนมัติ
       this.form.studentName = this.user.name || '';
       this.form.email = this.user.email || '';
-      this.form.studentId = this.user.studentId || ''; // สมมติว่ามี studentId ในข้อมูลผู้ใช้
+      this.form.studentId = this.user.studentId || '';
       this.form.signature = this.user.name || '';
     } else {
       // ถ้าไม่ล็อกอิน redirect ไป login
@@ -181,17 +210,89 @@ export default {
       this.$router.push('/login');
     }
   },
+  async mounted() {
+    await this.fetchCourses();
+  },
   methods: {
-    submitForm() {
-      // ส่งข้อมูลไป Backend
-      console.log('Form submitted:', { ...this.form, userId: this.user?._id });
-      alert('คำร้องถูกส่งเรียบร้อยแล้ว!');
-      this.$router.push('/');
+    async fetchCourses() {
+      try {
+        const response = await axios.get('/api/subjects');
+        this.courses = response.data;
+        if (response.data.length === 0) {
+          alert('ไม่พบข้อมูลรายวิชาในระบบ กรุณาติดต่อผู้ดูแล');
+        }
+      } catch (error) {
+        console.error('Error fetching courses:', error.response?.data || error.message);
+        let errorMessage = 'เกิดข้อผิดพลาดในการโหลดรายวิชา กรุณาตรวจสอบการเชื่อมต่อ backend';
+        if (error.response?.status === 404) {
+          errorMessage = 'ไม่พบ endpoint รายวิชา กรุณาตรวจสอบ Backend';
+        } else if (error.response?.status === 500) {
+          errorMessage = 'เกิดข้อผิดพลาดในเซิร์ฟเวอร์ กรุณาติดต่อผู้ดูแล';
+        }
+        alert(errorMessage);
+      }
     },
-    saveDraft() {
-      // บันทึกแบบร่าง (อาจเก็บใน localStorage หรือ Backend)
-      console.log('Draft saved:', { ...this.form, userId: this.user?._id });
-      alert('บันทึกแบบร่างเรียบร้อยแล้ว!');
+    updateCourseDetails() {
+      const selectedCourse = this.courses.find(course => course.subjectCode === this.form.courseCode);
+      if (selectedCourse) {
+        this.form.courseTitle = selectedCourse.subjectName;
+        this.form.credits = selectedCourse.credits.toString();
+      } else {
+        this.form.courseTitle = '';
+        this.form.credits = '';
+      }
+    },
+    validateContactNumber() {
+      const contactNumber = this.form.contactNumber;
+      if (!/^\d{10}$/.test(contactNumber)) {
+        this.contactNumberError = 'เบอร์โทรศัพท์ต้องมี 10 หลักและเป็นตัวเลขเท่านั้น';
+      } else {
+        this.contactNumberError = '';
+      }
+    },
+    validateEmail() {
+      const email = this.form.email;
+      if (!email.endsWith('@rmuti.ac.th')) {
+        this.emailError = 'อีเมลต้องลงท้ายด้วย @rmuti.ac.th';
+      } else {
+        this.emailError = '';
+      }
+    },
+    async submitForm() {
+      // ตรวจสอบก่อนส่ง
+      this.validateContactNumber();
+      this.validateEmail();
+
+      if (this.contactNumberError || this.emailError) {
+        alert('กรุณาแก้ไขข้อมูลที่ไม่ถูกต้องก่อนยื่นคำร้อง');
+        return;
+      }
+
+      try {
+        const response = await axios.post('/api/request-form/submit', {
+          ...this.form,
+          userId: this.user?._id,
+        });
+        console.log('Form submitted:', response.data);
+        alert('คำร้องถูกส่งและบันทึกเรียบร้อยแล้ว!');
+        this.$router.push('/');
+      } catch (error) {
+        console.error('Error submitting form:', error.response?.data || error.message);
+        alert('เกิดข้อผิดพลาดในการส่งคำร้อง กรุณาตรวจสอบข้อมูลหรือการเชื่อมต่อ');
+      }
+    },
+    async saveDraft() {
+      try {
+        const response = await axios.post('/api/request-form/draft', {
+          ...this.form,
+          userId: this.user?._id,
+        });
+        console.log('Draft saved:', response.data);
+        alert('บันทึกแบบร่างเรียบร้อยแล้ว!');
+      } catch (error) {
+        console.error('Error saving draft:', error.response?.data || error.message);
+        alert('เกิดข้อผิดพลาดในการบันทึกแบบร่าง กรุณาตรวจสอบข้อมูลหรือการเชื่อมต่อ');
+      }
     },
   },
 };
@@ -271,7 +372,7 @@ export default {
   padding: 20px;
   background: #f9f9f9;
   border-radius: 8px;
-  border-left: 5px solid #1a73e8;
+  border=left: 5px solid #1a73e8;
   transition: transform 0.3s;
 }
 
@@ -317,7 +418,8 @@ export default {
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group select:focus {
   border-color: #1a73e8;
   box-shadow: 0 0 5px rgba(26, 115, 232, 0.3);
   outline: none;
@@ -365,13 +467,29 @@ export default {
   font-weight: 500;
 }
 
-.course-table input {
+.course-table input,
+.course-table select {
   width: 100%;
   padding: 10px;
   border: 1px solid #ddd;
   border-radius: 5px;
   font-family: 'Kanit', sans-serif;
   font-size: 1rem;
+}
+
+.course-table select {
+  background: #fff;
+}
+
+.course-table select:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 5px rgba(26, 115, 232, 0.3);
+  outline: none;
+}
+
+.course-table input[readonly] {
+  background: #f0f0f0;
+  cursor: not-allowed;
 }
 
 .form-actions {
@@ -411,5 +529,12 @@ export default {
 .draft-btn:hover {
   background: #e08e0b;
   transform: translateY(-2px);
+}
+
+.error-message {
+  color: #d32f2f;
+  font-size: 0.9rem;
+  margin-top: 5px;
+  display: block;
 }
 </style>
