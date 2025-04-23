@@ -4,6 +4,9 @@ const express = require('express');
    const passport = require('./config/passport');
    const connectDB = require('./config/db');
    const apiRoutes = require('./routes/api');
+   const subjectRoutes = require('./routes/subjectapi');
+   const addSeatRequestRoutes = require('./routes/AddSeatRequestapi');
+   const requestFormRoutes = require('./routes/OpenCourseRequest');
 
    const app = express();
 
@@ -25,6 +28,9 @@ const express = require('express');
 
    // Routes
    app.use('/api', apiRoutes);
+   app.use('/api/subjects', subjectRoutes);
+  app.use('/api/addseatrequests', addSeatRequestRoutes);
+  app.use('/api/request-form', requestFormRoutes);
 
    // เริ่มเซิร์ฟเวอร์
    const PORT = process.env.PORT || 3000;
