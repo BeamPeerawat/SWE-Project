@@ -319,20 +319,28 @@ export default {
   gap: 15px;
 }
 
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap; /* อนุญาตให้ wrap ไปแถวใหม่ถ้าพื้นที่ไม่พอ */
+  gap: 20px; /* ระยะห่างระหว่าง checkbox */
+  align-items: center; /* จัดแนวในแนวตั้งให้อยู่กึ่งกลาง */
+}
+
 .checkbox-group label {
   display: flex;
-  align-items: center;
-  gap: 5px;
-  font-weight: 400;
-  font-size: 1rem;
+  align-items: center; /* จัด checkbox และข้อความให้อยู่ในแนวเดียวกัน */
+  gap: 8px; /* ระยะห่างระหว่าง checkbox และข้อความ */
+  font-weight: 400; /* น้ำหนักตัวอักษร */
+  font-size: 1rem; /* ขนาดตัวอักษร */
+  min-width: 120px; /* กำหนดความกว้างขั้นต่ำเพื่อให้ดูสมดุล */
+  cursor: pointer; /* เปลี่ยน cursor เมื่อ hover */
 }
 
-.course-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
+.checkbox-group input[type="checkbox"] {
+  width: 18px; /* ขนาดของ checkbox */
+  height: 18px; /* ขนาดของ checkbox */
+  accent-color: #007bff; /* สีของ checkbox เมื่อเลือก (สามารถปรับได้) */
 }
-
 .course-table th,
 .course-table td {
   border: 1px solid #ddd;

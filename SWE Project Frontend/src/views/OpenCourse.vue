@@ -1,6 +1,6 @@
 <template>
   <div class="open-course-page">
-    <!-- Header -->
+    <!-- Header Section -->
     <div class="form-header">
       <div class="header-content">
         <img src="@/assets/rmuti-logo.png" alt="RMUTI Logo" class="logo" />
@@ -17,7 +17,7 @@
     <!-- Form Body -->
     <div class="form-container">
       <form @submit.prevent="submitForm">
-        <!-- Section 1: General Info -->
+        <!-- Section 1: General Information -->
         <div class="form-section">
           <h2>ข้อมูลทั่วไป</h2>
           <div class="form-group">
@@ -41,7 +41,7 @@
           </div>
         </div>
 
-        <!-- Section 2: Student Info -->
+        <!-- Section 2: Student Information -->
         <div class="form-section">
           <h2>ข้อมูลนักศึกษา</h2>
           <div class="form-group">
@@ -72,7 +72,7 @@
           </div>
         </div>
 
-        <!-- Section 3: Course Info -->
+        <!-- Section 3: Course Information -->
         <div class="form-section">
           <h2>ข้อมูลรายวิชา</h2>
           <div class="form-group">
@@ -107,13 +107,25 @@
           </div>
         </div>
 
-        <!-- Section 4: Contact Info -->
+        <!-- Section 4: Contact Information -->
         <div class="form-section">
           <h2>ข้อมูลติดต่อ</h2>
           <div class="form-group">
             <label>เพื่อพิจารณาคำร้องนี้:</label>
             <p>ติดต่อนักศึกษา:</p>
-            <input type="text" v-model="form.contactNumber" placeholder="เบอร์โทรศัพท์" required />
+            <input
+              type="tel"
+              v-model="form.contactNumber"
+              placeholder="เบอร์โทรศัพท์"
+              maxlength="10"
+              inputmode="numeric"
+              pattern="[0-9]{10}"
+              @input="restrictToNumbers"
+              required
+            />
+            <span v-if="form.contactNumber && form.contactNumber.length !== 10" class="error-message">
+              กรุณากรอกเบอร์โทรศัพท์ 10 หลัก
+            </span>
             <input type="email" v-model="form.email" placeholder="อีเมล" required />
           </div>
         </div>
@@ -142,6 +154,8 @@ import axios from 'axios';
 
 export default {
   name: 'OpenCoursePage',
+
+  // Data
   data() {
     return {
       form: {
@@ -167,10 +181,15 @@ export default {
       courses: []
     };
   },
+
+  // Lifecycle Hooks
   async created() {
     await this.fetchCourses();
   },
+
+  // Methods
   methods: {
+    // Fetch course data from backend
     async fetchCourses() {
       try {
         const response = await axios.get('http://localhost:3000/api/subject');
@@ -180,6 +199,8 @@ export default {
         alert('เกิดข้อผิดพลาดในการโหลดรายวิชา กรุณาตรวจสอบการเชื่อมต่อ backend');
       }
     },
+
+    // Update course details based on selected course code
     updateCourseDetails() {
       const selectedCourse = this.courses.find(course => course.subjectCode === this.form.courseCode);
       if (selectedCourse) {
@@ -190,6 +211,13 @@ export default {
         this.form.credits = '';
       }
     },
+
+    // Restrict phone number input to numeric characters
+    restrictToNumbers(event) {
+      this.form.contactNumber = event.target.value.replace(/[^0-9]/g, '');
+    },
+
+    // Submit form to backend
     async submitForm() {
       try {
         const response = await axios.post('http://localhost:3000/api/request-form/submit', this.form);
@@ -201,6 +229,8 @@ export default {
         alert('เกิดข้อผิดพลาดในการส่งคำร้อง กรุณาตรวจสอบข้อมูลหรือการเชื่อมต่อ');
       }
     },
+
+    // Save form as draft
     async saveDraft() {
       try {
         const response = await axios.post('http://localhost:3000/api/request-form/draft', this.form);
@@ -216,6 +246,7 @@ export default {
 </script>
 
 <style scoped>
+/* General Page Styling */
 .open-course-page {
   min-height: 100vh;
   background: #f5f7fa;
@@ -223,6 +254,7 @@ export default {
   padding: 20px;
 }
 
+/* Header Styling */
 .form-header {
   display: flex;
   justify-content: space-between;
@@ -277,6 +309,7 @@ export default {
   background: #e0e0e0;
 }
 
+/* Form Container Styling */
 .form-container {
   background: white;
   padding: 30px;
@@ -284,6 +317,7 @@ export default {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
+/* Form Section Styling */
 .form-section {
   margin-bottom: 30px;
   padding: 20px;
@@ -305,6 +339,7 @@ export default {
   padding-bottom: 5px;
 }
 
+/* Form Group Styling */
 .form-group {
   margin-bottom: 20px;
 }
@@ -342,6 +377,7 @@ export default {
   outline: none;
 }
 
+/* Inline Inputs */
 .inline-inputs {
   display: flex;
   gap: 15px;
@@ -351,20 +387,35 @@ export default {
   flex: 1;
 }
 
+/* Checkbox Group Styling */
 .checkbox-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 15px;
+  gap: 20px;
+  align-items: center;
 }
 
 .checkbox-group label {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   font-weight: 400;
   font-size: 1rem;
+  min-width: 120px;
+  cursor: pointer;
 }
 
+.checkbox-group input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #007bff;
+}
+
+.checkbox-group label:hover {
+  color: #0056b3;
+}
+
+/* Course Table Styling */
 .course-table {
   width: 100%;
   border-collapse: collapse;
@@ -394,6 +445,15 @@ export default {
   font-size: 1rem;
 }
 
+/* Error Message Styling */
+.error-message {
+  color: #d32f2f;
+  font-size: 0.9rem;
+  margin-top: 5px;
+  display: block;
+}
+
+/* Form Actions Styling */
 .form-actions {
   display: flex;
   justify-content: center;
