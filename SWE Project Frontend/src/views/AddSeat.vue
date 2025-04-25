@@ -15,6 +15,42 @@
       </button>
     </div>
 
+    <!-- Drafts Button -->
+    <div class="drafts-section">
+      <button class="drafts-btn" @click="showDrafts">ดูแบบร่าง ({{ draftCount }})</button>
+    </div>
+
+    <!-- Drafts Modal -->
+    <div v-if="showDraftsModal" class="modal-overlay">
+      <div class="modal-content">
+        <h2>แบบร่างของคุณ</h2>
+        <table class="drafts-table">
+          <thead>
+            <tr>
+              <th>รหัสวิชา</th>
+              <th>ชื่อวิชา</th>
+              <th>ภาคการศึกษา</th>
+              <th>วันที่บันทึก</th>
+              <th>การกระทำ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="draft in drafts" :key="draft._id">
+              <td>{{ draft.courseCode }}</td>
+              <td>{{ draft.courseTitle }}</td>
+              <td>{{ draft.semester }}/{{ draft.academicYear }}</td>
+              <td>{{ formatDate(draft.createdAt) }}</td>
+              <td>
+                <button class="action-btn" @click="loadDraft(draft._id)">โหลด</button>
+                <button class="action-btn delete-btn" @click="deleteDraft(draft._id)">ลบ</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <button class="close-btn" @click="showDraftsModal = false">ปิด</button>
+      </div>
+    </div>
+
     <!-- Form Body -->
     <div class="form-container">
       <form @submit.prevent="submitForm">
@@ -160,10 +196,28 @@
         </div>
       </form>
     </div>
+
+    <!-- Add Popup Notification Component -->
+    <div v-if="showPopup" class="popup-overlay">
+      <div class="popup-content">
+        <div class="popup-header">
+          <i class="fas fa-check-circle success-icon"></i>
+          <h2>แจ้งเตือน</h2>
+        </div>
+        <div class="popup-body">
+          <p>{{ popupMessage }}</p>
+        </div>
+        <div class="popup-footer">
+          <button @click="closePopup" class="popup-btn">ตกลง</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   name: 'AddSeatPage',
   data() {
@@ -196,6 +250,11 @@ export default {
       subjects: [],
       contactNumberError: '',
       emailError: '',
+      showPopup: false,
+      popupMessage: '',
+      showDraftsModal: false,
+      drafts: [],
+      draftCount: 0,
     };
   },
   created() {
@@ -205,7 +264,7 @@ export default {
       this.user = JSON.parse(userData);
       // ตรวจสอบว่าเป็นอีเมล @rmuti.ac.th
       if (!this.user.email.endsWith('@rmuti.ac.th')) {
-        alert('กรุณาใช้อีเมลที่ลงท้ายด้วย @rmuti.ac.th');
+        this.showPopupMessage('กรุณาใช้อีเมลที่ลงท้ายด้วย @rmuti.ac.th');
         this.$router.push('/login');
         return;
       }
@@ -216,21 +275,68 @@ export default {
       this.form.signature = this.user.name || '';
     } else {
       // ถ้าไม่ล็อกอิน redirect ไป login
-      alert('กรุณาล็อกอินก่อนยื่นคำร้อง');
+      this.showPopupMessage('กรุณาล็อกอินก่อนยื่นคำร้อง');
       this.$router.push('/login');
     }
   },
-  mounted() {
-    this.fetchSubjects();
+  async mounted() {
+    await this.fetchSubjects();
+    await this.fetchDrafts();
   },
   methods: {
     async fetchSubjects() {
       try {
-        const response = await this.$axios.get('http://localhost:3000/api/subjects');
+        const response = await axios.get('/api/subjects');
         this.subjects = response.data;
+        if (response.data.length === 0) {
+          this.showPopupMessage('ไม่พบข้อมูลรายวิชาในระบบ กรุณาติดต่อผู้ดูแล');
+        }
       } catch (error) {
-        console.error('Error fetching subjects:', error);
-        alert('ไม่สามารถดึงข้อมูลรายวิชาได้');
+        console.error('Error fetching subjects:', error.response?.data || error.message);
+        let errorMessage = 'เกิดข้อผิดพลาดในการโหลดรายวิชา กรุณาตรวจสอบการเชื่อมต่อ backend';
+        if (error.response?.status === 404) {
+          errorMessage = 'ไม่พบ endpoint รายวิชา กรุณาตรวจสอบ Backend';
+        } else if (error.response?.status === 500) {
+          errorMessage = 'เกิดข้อผิดพลาดในเซิร์ฟเวอร์ กรุณาติดต่อผู้ดูแล';
+        }
+        this.showPopupMessage(errorMessage);
+      }
+    },
+    async fetchDrafts() {
+      try {
+        const response = await axios.get(`/api/addseatrequests/drafts/${this.user._id}`);
+        this.drafts = response.data.drafts;
+        this.draftCount = response.data.count;
+      } catch (error) {
+        console.error('Error fetching drafts:', error.response?.data || error.message);
+        this.showPopupMessage('เกิดข้อผิดพลาดในการโหลดแบบร่าง');
+      }
+    },
+    async showDrafts() {
+      await this.fetchDrafts();
+      this.showDraftsModal = true;
+    },
+    async loadDraft(draftId) {
+      try {
+        const response = await axios.get(`/api/addseatrequests/${draftId}`);
+        this.form = { ...response.data, levelOfStudy: response.data.levelOfStudy || [] };
+        this.showDraftsModal = false;
+        this.showPopupMessage('โหลดแบบร่างสำเร็จ!');
+      } catch (error) {
+        console.error('Error loading draft:', error.response?.data || error.message);
+        this.showPopupMessage('เกิดข้อผิดพลาดในการโหลดแบบร่าง');
+      }
+    },
+    async deleteDraft(draftId) {
+      if (confirm('ยืนยันการลบแบบร่างนี้?')) {
+        try {
+          await axios.delete(`/api/addseatrequests/${draftId}`);
+          await this.fetchDrafts();
+          this.showPopupMessage('ลบแบบร่างสำเร็จ!');
+        } catch (error) {
+          console.error('Error deleting draft:', error.response?.data || error.message);
+          this.showPopupMessage('เกิดข้อผิดพลาดในการลบแบบร่าง');
+        }
       }
     },
     updateCourseDetails() {
@@ -260,31 +366,57 @@ export default {
       }
     },
     async submitForm() {
-      // ตรวจสอบก่อนส่ง
       this.validateContactNumber();
       this.validateEmail();
 
       if (this.contactNumberError || this.emailError) {
-        alert('กรุณาแก้ไขข้อมูลที่ไม่ถูกต้องก่อนยื่นคำร้อง');
+        this.showPopupMessage('กรุณาแก้ไขข้อมูลที่ไม่ถูกต้องก่อนยื่นคำร้อง');
         return;
       }
 
       try {
-        const response = await this.$axios.post('http://localhost:3000/api/addseatrequests', {
+        const response = await axios.post('/api/addseatrequests', {
           ...this.form,
           userId: this.user?._id,
         });
         console.log('Form submitted:', response.data);
-        alert('คำร้องถูกส่งและบันทึกเรียบร้อยแล้ว!');
-        this.$router.push('/');
+        this.showPopupMessage('คำร้องถูกส่งและบันทึกเรียบร้อยแล้ว!');
+        setTimeout(() => {
+          this.$router.push('/');
+        }, 2000);
       } catch (error) {
-        console.error('Error submitting form:', error);
-        alert('เกิดข้อผิดพลาดในการบันทึกคำร้อง: ' + error.response?.data?.message || error.message);
+        console.error('Error submitting form:', error.response?.data || error.message);
+        this.showPopupMessage('เกิดข้อผิดพลาดในการบันทึกคำร้อง: ' + (error.response?.data?.message || error.message));
       }
     },
-    saveDraft() {
-      console.log('Draft saved:', { ...this.form, userId: this.user?._id });
-      alert('บันทึกแบบร่างเรียบร้อยแล้ว!');
+    async saveDraft() {
+      try {
+        const response = await axios.post('/api/addseatrequests/draft', {
+          ...this.form,
+          userId: this.user?._id,
+        });
+        console.log('Draft saved:', response.data);
+        await this.fetchDrafts();
+        this.showPopupMessage(`บันทึกแบบร่างสำเร็จ! คุณมีแบบร่างทั้งหมด ${this.draftCount} ฉบับ`);
+      } catch (error) {
+        console.error('Error saving draft:', error.response?.data || error.message);
+        this.showPopupMessage('เกิดข้อผิดพลาดในการบันทึกแบบร่าง: ' + (error.response?.data?.message || error.message));
+      }
+    },
+    formatDate(date) {
+      return new Date(date).toLocaleDateString('th-TH', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    },
+    showPopupMessage(message) {
+      this.popupMessage = message;
+      this.showPopup = true;
+    },
+    closePopup() {
+      this.showPopup = false;
+      this.popupMessage = '';
     },
   },
 };
@@ -405,7 +537,8 @@ export default {
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group select:focus {
   border-color: #1a73e8;
   box-shadow: 0 0 5px rgba(26, 115, 232, 0.3);
   outline: none;
@@ -522,5 +655,196 @@ export default {
   font-size: 0.9rem;
   margin-top: 5px;
   display: block;
+}
+
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.popup-content {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 400px;
+  animation: popup-appear 0.3s ease-out;
+}
+
+.popup-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.success-icon {
+  color: #4CAF50;
+  font-size: 48px;
+  margin-bottom: 10px;
+}
+
+.popup-header h2 {
+  color: #333;
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.popup-body {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.popup-body p {
+  margin: 0;
+  color: #666;
+  font-size: 1.1rem;
+  line-height: 1.5;
+}
+
+.popup-footer {
+  text-align: center;
+}
+
+.popup-btn {
+  background: #1a73e8;
+  color: white;
+  border: none;
+  padding: 10px 30px;
+  border-radius: 5px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.popup-btn:hover {
+  background: #1557b0;
+}
+
+@keyframes popup-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.drafts-section {
+  margin-bottom: 20px;
+  text-align: right;
+}
+
+.drafts-btn {
+  padding: 10px 20px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Kanit', sans-serif;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.drafts-btn:hover {
+  background: #45a049;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-content h2 {
+  font-size: 1.5rem;
+  color: #1a73e8;
+  margin-bottom: 20px;
+}
+
+.drafts-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.drafts-table th,
+.drafts-table td {
+  border: 1px solid #ddd;
+  padding: 10px;
+  text-align: left;
+}
+
+.drafts-table th {
+  background: #1a73e8;
+  color: white;
+}
+
+.drafts-table td {
+  background: #f9f9f9;
+}
+
+.action-btn {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Kanit', sans-serif;
+  cursor: pointer;
+  margin: 0 5px;
+}
+
+.action-btn:not(.delete-btn) {
+  background: #1a73e8;
+  color: white;
+}
+
+.delete-btn {
+  background: #d32f2f;
+  color: white;
+}
+
+.action-btn:hover {
+  opacity: 0.9;
+}
+
+.close-btn {
+  display: block;
+  margin: 20px auto 0;
+  padding: 10px 20px;
+  background: #f1f3f5;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Kanit', sans-serif;
+  cursor: pointer;
+}
+
+.close-btn:hover {
+  background: #e0e0e0;
 }
 </style>

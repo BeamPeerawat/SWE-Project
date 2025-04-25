@@ -36,18 +36,20 @@ export default {
     };
   },
   mounted() {
-    // ตรวจสอบ query parameter หลังจาก Google callback
-    const urlParams = new URLSearchParams(window.location.search);
-    const user = urlParams.get('user');
-    if (user) {
-      try {
-        const userData = JSON.parse(decodeURIComponent(user));
-        localStorage.setItem('user', JSON.stringify(userData));
-        this.$router.push('/home');
-      } catch (error) {
-        this.errorMessage = 'เกิดข้อผิดพลาดในการล็อกอิน';
-      }
+  // ตรวจสอบ query parameter หลังจาก Google callback
+  const urlParams = new URLSearchParams(window.location.search);
+  const user = urlParams.get('user');
+  if (user) {
+    try {
+      const userData = JSON.parse(decodeURIComponent(user));
+      // ล้าง localStorage ก่อนบันทึกข้อมูลผู้ใช้ใหม่
+      localStorage.removeItem('user');
+      localStorage.setItem('user', JSON.stringify(userData));
+      this.$router.push('/home');
+    } catch (error) {
+      this.errorMessage = 'เกิดข้อผิดพลาดในการล็อกอิน';
     }
+  }
   },
   methods: {
     loginWithGoogle() {
