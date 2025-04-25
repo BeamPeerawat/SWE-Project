@@ -1,7 +1,6 @@
-// SWE Project Backend/models/OpenCourseRequest.js
 const mongoose = require('mongoose');
 
-const requestFormSchema = new mongoose.Schema({
+const openCourseRequestSchema = new mongoose.Schema({
   semester: {
     type: String,
     required: true,
@@ -95,7 +94,12 @@ const requestFormSchema = new mongoose.Schema({
     type: String,
     enum: ['draft', 'submitted'],
     default: 'draft'
+  },
+  userId: {
+    type: String,
+    required: true,
+    trim: true
   }
-}, { timestamps: true });
+}, { collection: 'opencourserequests', timestamps: true });
 
-module.exports = mongoose.model('OpenCourseRequest', requestFormSchema);
+module.exports = mongoose.model('OpenCourseRequest', openCourseRequestSchema);

@@ -1,14 +1,46 @@
-// SWE Project Backend/routes/OpenCourseRequest.js
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const OpenCourseRequest = require('../models/OpenCourseRequest');
+
+// GET all draft forms for a user
+router.get('/drafts/:userId', async (req, res) => {
+  try {
+    const drafts = await OpenCourseRequest.find({
+      userId: req.params.userId,
+      status: 'draft'
+    }).select('courseCode courseTitle semester academicYear createdAt');
+    const count = drafts.length;
+    res.json({ drafts, count });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
 // GET all request forms
 router.get('/', async (req, res) => {
   try {
     const forms = await OpenCourseRequest.find().select('-__v');
     res.json(forms);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET open course requests by email
+router.get('/opencourserequests', async (req, res) => {
+  try {
+    const { email, userId } = req.query;
+    const query = {};
+    if (email) query.email = email;
+    if (userId) query.userId = userId;
+
+    if (!email && !userId) {
+      return res.status(400).json({ message: 'ต้องระบุ email หรือ userId' });
+    }
+
+    const requests = await OpenCourseRequest.find(query);
+    res.json(requests);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -31,6 +63,9 @@ router.get('/:id', async (req, res) => {
 // POST submit form
 router.post('/submit', async (req, res) => {
   try {
+    if (!req.body.userId) {
+      return res.status(400).json({ message: 'userId is required' });
+    }
     const form = new OpenCourseRequest({
       ...req.body,
       status: 'submitted'
@@ -45,12 +80,19 @@ router.post('/submit', async (req, res) => {
 // POST save draft
 router.post('/draft', async (req, res) => {
   try {
+    if (!req.body.userId) {
+      return res.status(400).json({ message: 'userId is required' });
+    }
     const form = new OpenCourseRequest({
       ...req.body,
       status: 'draft'
     });
     const savedForm = await form.save();
-    res.status(201).json(savedForm);
+    const draftCount = await OpenCourseRequest.countDocuments({
+      userId: req.body.userId,
+      status: 'draft'
+    });
+    res.status(201).json({ form: savedForm, draftCount });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -65,7 +107,6 @@ router.put('/:id', async (req, res) => {
     const form = await OpenCourseRequest.findById(req.params.id);
     if (!form) return res.status(404).json({ message: 'Form not found' });
 
-    // อัปเดตเฉพาะฟิลด์ที่ส่งมา
     Object.keys(req.body).forEach(key => {
       if (key !== 'status') form[key] = req.body[key];
     });
@@ -86,7 +127,7 @@ router.delete('/:id', async (req, res) => {
     const form = await OpenCourseRequest.findById(req.params.id);
     if (!form) return res.status(404).json({ message: 'Form not found' });
 
-    await form.remove();
+    await form.deleteOne();
     res.json({ message: 'Form deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });

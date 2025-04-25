@@ -23,7 +23,16 @@ const addSeatRequestSchema = new mongoose.Schema({
   contactNumber: { type: String, required: true, trim: true },
   email: { type: String, required: true, trim: true },
   signature: { type: String, required: true, trim: true },
-  createdAt: { type: Date, default: Date.now }
-}, { collection: 'addseatrequests' });
+  status: {
+    type: String,
+    enum: ['draft', 'submitted'],
+    default: 'draft'
+  },
+  userId: {
+    type: String,
+    required: true,
+    trim: true
+  }
+}, { collection: 'addseatrequests', timestamps: true });
 
 module.exports = mongoose.model('AddSeatRequest', addSeatRequestSchema);
