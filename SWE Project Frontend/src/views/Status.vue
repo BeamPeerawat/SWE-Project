@@ -14,6 +14,15 @@
       </button>
     </div>
 
+    <!-- Notification -->
+    <div v-if="showNotification" class="notification" :class="notificationType">
+      <i :class="notificationIcon"></i>
+      <span>{{ notificationMessage }}</span>
+      <button class="notification-close" @click="closeNotification">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
     <!-- Status Body -->
     <div class="status-body">
       <!-- Loading and Error States -->
@@ -116,7 +125,7 @@
                 </div>
                 <div class="detail-item">
                   <label><i class="fas fa-file-signature"></i> ประเภทคำร้อง:</label>
-                  <p>คำร้องขอเปิดรายวิชานอกแผน</p>
+                  <p>{{ selectedRequest.type }}</p>
                 </div>
                 <div class="detail-item">
                   <label><i class="fas fa-book"></i> รายวิชา:</label>
@@ -176,6 +185,30 @@
               <button class="modal-close-btn" @click="closeModal">
                 <i class="fas fa-times-circle"></i> ปิด
               </button>
+              <button class="modal-close-btn2" @click="cancelRequest">
+                <i class="fas fa-times-circle"></i> ยกเลิกคำร้อง
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Confirm Cancel Modal -->
+        <div v-if="showConfirmModal" class="confirm-modal-overlay" @click="closeConfirmModal">
+          <div class="confirm-modal-content" @click.stop>
+            <div class="confirm-modal-header">
+              <h3><i class="fas fa-exclamation-circle"></i> ยืนยันการยกเลิก</h3>
+            </div>
+            <div class="confirm-modal-body">
+              <p>คุณแน่ใจหรือไม่ว่าต้องการยกเลิกคำร้องนี้?</p>
+              <p class="highlight">{{ `${selectedRequest.courseCode} - ${selectedRequest.courseTitle}` }}</p>
+            </div>
+            <div class="confirm-modal-footer">
+              <button class="confirm-btn" @click="confirmCancel">
+                <i class="fas fa-check"></i> ยืนยัน
+              </button>
+              <button class="cancel-btn" @click="closeConfirmModal">
+                <i class="fas fa-times"></i> ยกเลิก
+              </button>
             </div>
           </div>
         </div>
@@ -200,7 +233,13 @@ export default {
       isLoading: false,
       errorMessage: '',
       showModal: false,
-      selectedRequest: null
+      showConfirmModal: false,
+      selectedRequest: null,
+      // Notification data
+      showNotification: false,
+      notificationMessage: '',
+      notificationType: 'success',
+      notificationIcon: 'fas fa-check-circle'
     };
   },
   computed: {
@@ -348,6 +387,76 @@ export default {
     closeModal() {
       this.showModal = false;
       this.selectedRequest = null;
+    },
+    cancelRequest() {
+      // แสดงป็อปอัพยืนยัน
+      this.showConfirmModal = true;
+    },
+    closeConfirmModal() {
+      this.showConfirmModal = false;
+    },
+    async confirmCancel() {
+      try {
+        // ตรวจสอบว่า selectedRequest มีค่าและมี _id
+        if (!this.selectedRequest || !this.selectedRequest._id) {
+          throw new Error('ไม่พบข้อมูลคำร้องที่เลือก');
+        }
+
+        // กำหนด endpoint ตามประเภทคำร้อง
+        const endpoint =
+          this.selectedRequest.type === 'คำร้องขอเปิดรายวิชานอกแผน'
+            ? `http://localhost:3000/api/opencourserequests/${this.selectedRequest._id}`
+            : `http://localhost:3000/api/addseatrequests/${this.selectedRequest._id}`;
+
+        // ส่งคำขอ DELETE ไปยัง backend
+        await axios.delete(endpoint);
+
+        // แสดง notification
+        this.showNotification = true;
+        this.notificationMessage = 'ยกเลิกคำร้องสำเร็จ';
+        this.notificationType = 'success';
+        this.notificationIcon = 'fas fa-check-circle';
+
+        // ลบคำร้องออกจาก state
+        this.requests = this.requests.filter(
+          request => request._id !== this.selectedRequest._id
+        );
+        this.filteredRequests = this.filteredRequests.filter(
+          request => request._id !== this.selectedRequest._id
+        );
+
+        // ปิด modals ทั้งสอง
+        this.closeConfirmModal();
+        this.closeModal();
+
+        // รีเซ็ตหน้า pagination ถ้าจำเป็น
+        if (this.filteredRequests.length === 0 && this.currentPage > 1) {
+          this.currentPage--;
+        }
+
+        // Auto-hide notification หลัง 5 วินาที
+        setTimeout(() => {
+          this.closeNotification();
+        }, 5000);
+      } catch (error) {
+        console.error('เกิดข้อผิดพลาดในการยกเลิกคำร้อง:', error);
+        // แสดง notification ข้อผิดพลาด
+        this.showNotification = true;
+        this.notificationMessage = 'ไม่สามารถยกเลิกคำร้องได้ กรุณาลองใหม่';
+        this.notificationType = 'error';
+        this.notificationIcon = 'fas fa-exclamation-circle';
+
+        // ปิด confirm modal
+        this.closeConfirmModal();
+
+        // Auto-hide notification หลัง 5 วินาที
+        setTimeout(() => {
+          this.closeNotification();
+        }, 5000);
+      }
+    },
+    closeNotification() {
+      this.showNotification = false;
     }
   },
   async created() {
@@ -827,11 +936,31 @@ export default {
   position: sticky;
   bottom: 0;
   z-index: 10;
+  display: flex;
+  justify-content: space-between;
 }
 
 .modal-close-btn {
   padding: 12px 30px;
   background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Kanit', sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.modal-close-btn2 {
+  padding: 12px 30px;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
   color: white;
   border: none;
   border-radius: 10px;
@@ -869,6 +998,139 @@ export default {
   width: 200px;
   height: 200px;
   animation: ripple 0.6s ease-out;
+}
+
+.modal-close-btn2:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+}
+
+.modal-close-btn2::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.6s ease, height 0.6s ease;
+}
+
+.modal-close-btn2:active::before {
+  width: 200px;
+  height: 200px;
+  animation: ripple 0.6s ease-out;
+}
+
+/* Confirm Modal Styling */
+.confirm-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  animation: modalFade 0.3s ease-out;
+}
+
+.confirm-modal-content {
+  background: white;
+  border-radius: 10px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  animation: modalGlow 0.5s ease-out;
+}
+
+.confirm-modal-header {
+  padding: 15px 20px;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+
+.confirm-modal-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.confirm-modal-body {
+  padding: 20px;
+  text-align: center;
+}
+
+.confirm-modal-body p {
+  font-size: 1rem;
+  font-weight: 400;
+  color: #333;
+  margin: 0 0 10px;
+}
+
+.confirm-modal-body p.highlight {
+  font-weight: 500;
+  color: #1a73e8;
+}
+
+.confirm-modal-footer {
+  padding: 15px 20px;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+.confirm-btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Kanit', sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.confirm-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
+}
+
+.cancel-btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Kanit', sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.cancel-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
 }
 
 /* Responsive Design */
@@ -917,8 +1179,102 @@ export default {
     font-size: 0.95rem;
   }
 
-  .modal-close-btn {
+  .modal-close-btn,
+  .modal-close-btn2 {
     padding: 10px 25px;
+  }
+
+  .confirm-modal-content {
+    width: 95%;
+  }
+
+  .confirm-modal-header h3 {
+    font-size: 1.1rem;
+  }
+
+  .confirm-modal-body p {
+    font-size: 0.95rem;
+  }
+
+  .confirm-btn,
+  .cancel-btn {
+    padding: 8px 15px;
+    font-size: 0.9rem;
+  }
+}
+
+/* Notification Styling */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 15px 20px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  z-index: 2000;
+  animation: slideIn 0.5s ease-out, fadeOut 0.5s ease-in 4.5s forwards;
+  max-width: 400px;
+}
+
+.notification.success {
+  background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+  color: white;
+}
+
+.notification.error {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+}
+
+.notification.warning {
+  background: linear-gradient(135deg, #f39c12 0%, #d35400 100%);
+  color: white;
+}
+
+.notification i {
+  font-size: 1.2rem;
+}
+
+.notification span {
+  font-size: 1rem;
+  font-weight: 500;
+  flex: 1;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0.8;
+  transition: opacity 0.3s;
+}
+
+.notification-close:hover {
+  opacity: 1;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 </style>

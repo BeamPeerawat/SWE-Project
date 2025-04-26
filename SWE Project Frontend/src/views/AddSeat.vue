@@ -92,11 +92,11 @@
           <div class="form-group">
             <label>ระดับการศึกษา:</label>
             <div class="checkbox-group">
-              <label><input type="checkbox" v-model="form.levelOfStudy" value="Certificate" /> ประกาศนียบัตร</label>
-              <label><input type="checkbox" v-model="form.levelOfStudy" value="Diploma" /> อนุปริญญา</label>
-              <label><input type="checkbox" v-model="form.levelOfStudy" value="Undergraduate" /> ปริญญาตรี</label>
-              <label><input type="checkbox" v-model="form.levelOfStudy" value="Master's Degree" /> ปริญญาโท</label>
-              <label><input type="checkbox" v-model="form.levelOfStudy" value="Doctoral Degree" /> ปริญญาเอก</label>
+              <label><input type="radio" v-model="form.levelOfStudy" value="Certificate" /><span>ประกาศนียบัตร</span></label>
+              <label><input type="radio" v-model="form.levelOfStudy" value="Diploma" /><span>อนุปริญญา</span></label>
+              <label><input type="radio" v-model="form.levelOfStudy" value="Undergraduate" /><span>ปริญญาตรี</span></label>
+              <label><input type="radio" v-model="form.levelOfStudy" value="Master's Degree" /><span>ปริญญาโท</span></label>
+              <label><input type="radio" v-model="form.levelOfStudy" value="Doctoral Degree" /><span>ปริญญาเอก</span></label>
             </div>
           </div>
           <div class="form-group">
@@ -232,7 +232,7 @@ export default {
         lecturer: '',
         studentName: '',
         studentId: '',
-        levelOfStudy: [],
+        levelOfStudy: '',
         faculty: '',
         fieldOfStudy: '',
         classLevel: '',
@@ -319,7 +319,7 @@ export default {
     async loadDraft(draftId) {
       try {
         const response = await axios.get(`/api/addseatrequests/${draftId}`);
-        this.form = { ...response.data, levelOfStudy: response.data.levelOfStudy || [] };
+        this.form = { ...response.data, levelOfStudy: response.data.levelOfStudy || '' };
         this.showDraftsModal = false;
         this.showPopupMessage('โหลดแบบร่างสำเร็จ!');
       } catch (error) {
@@ -557,6 +557,7 @@ export default {
   display: flex;
   flex-wrap: wrap;
   gap: 15px;
+  align-items: center;
 }
 
 .checkbox-group label {
@@ -565,6 +566,11 @@ export default {
   gap: 5px;
   font-weight: 400;
   font-size: 1rem;
+  white-space: nowrap; /* ป้องกันการตัดคำใน label */
+}
+
+.checkbox-group span {
+  white-space: nowrap; /* ป้องกันการตัดคำใน span เช่น "ปริญญาตรี" */
 }
 
 .course-table {
