@@ -6,8 +6,14 @@
         <img src="@/assets/rmuti-logo.png" alt="RMUTI Logo" class="logo" />
         <h1>ยินดีต้อนรับสู่ระบบยื่นคำร้องออนไลน์</h1>
         <p>มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน วิทยาเขตขอนแก่น</p>
-        <p v-if="user">ยินดีต้อนรับ: {{ user.email }}</p>
-        <router-link to="/request" class="cta-btn">เริ่มยื่นคำร้อง</router-link>
+        <p v-if="user" class="welcome-text">
+          <i class="fas fa-user-circle"></i>
+          ยินดีต้อนรับ: {{ user.email }}
+        </p>
+        <router-link to="/request/general" class="cta-btn">
+          <i class="fas fa-file-alt"></i>
+          เริ่มยื่นคำร้อง
+        </router-link>
       </div>
     </header>
 
@@ -16,22 +22,37 @@
       <h2>บริการของเรา</h2>
       <div class="features-grid">
         <div class="feature-card">
-          <i class="fas fa-file-alt"></i>
+          <div class="feature-icon">
+            <i class="fas fa-file-alt"></i>
+          </div>
           <h3>ยื่นคำร้อง</h3>
           <p>ยื่นคำร้องขอเพิ่มที่นั่งหรือเปิดรายวิชานอกแผนได้ง่าย ๆ</p>
-          <a href="#" class="feature-link" @click.prevent="openRequestModal">ไปที่ยื่นคำร้อง</a>
+          <a href="#" class="feature-link" @click.prevent="openRequestModal">
+            ไปที่ยื่นคำร้อง
+            <i class="fas fa-arrow-right"></i>
+          </a>
         </div>
         <div class="feature-card">
-          <i class="fas fa-tasks"></i>
+          <div class="feature-icon">
+            <i class="fas fa-tasks"></i>
+          </div>
           <h3>ตรวจสอบสถานะ</h3>
           <p>ติดตามสถานะคำร้องของคุณได้ทุกที่ทุกเวลา</p>
-          <router-link to="/status" class="feature-link">ไปที่สถานะคำขอ</router-link>
+          <router-link to="/status" class="feature-link">
+            ไปที่สถานะคำขอ
+            <i class="fas fa-arrow-right"></i>
+          </router-link>
         </div>
         <div class="feature-card">
-          <i class="fas fa-user"></i>
+          <div class="feature-icon">
+            <i class="fas fa-user"></i>
+          </div>
           <h3>โปรไฟล์</h3>
           <p>จัดการข้อมูลส่วนตัวและประวัติการยื่นคำร้อง</p>
-          <router-link to="/profile" class="feature-link">ไปที่โปรไฟล์</router-link>
+          <router-link to="/profile" class="feature-link">
+            ไปที่โปรไฟล์
+            <i class="fas fa-arrow-right"></i>
+          </router-link>
         </div>
       </div>
     </section>
@@ -43,9 +64,11 @@
         <p>คุณต้องการยื่นคำร้องประเภทใด?</p>
         <div class="modal-buttons">
           <router-link to="/request/add-seat" class="modal-btn add-seat-btn" @click="closeModal">
+            <i class="fas fa-user-plus"></i>
             คำร้องขอเพิ่มที่นั่ง
           </router-link>
           <router-link to="/request/open-course" class="modal-btn open-course-btn" @click="closeModal">
+            <i class="fas fa-book-open"></i>
             คำร้องขอเปิดรายวิชานอกแผน
           </router-link>
         </div>
@@ -72,7 +95,6 @@ export default {
     };
   },
   created() {
-    // ดึงข้อมูลผู้ใช้จาก localStorage
     const userData = localStorage.getItem('user');
     if (userData) {
       this.user = JSON.parse(userData);
@@ -102,26 +124,6 @@ export default {
   }
 }
 
-@keyframes scaleUp {
-  from {
-    transform: scale(1);
-  }
-  to {
-    transform: scale(1.05);
-  }
-}
-
-@keyframes modalFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
 .home-page {
   min-height: 100vh;
   background: #FFFFFF;
@@ -148,6 +150,9 @@ export default {
   height: 80px;
   border-radius: 50%;
   margin-bottom: 20px;
+  background: white;
+  padding: 5px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
 .hero-content h1 {
@@ -161,26 +166,44 @@ export default {
   color: #E5E7EB;
 }
 
+.welcome-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px 16px;
+  border-radius: 20px;
+  margin: 0 auto 20px;
+  max-width: fit-content;
+}
+
+.welcome-text i {
+  font-size: 1.2rem;
+}
+
 .cta-btn {
-  display: inline-block;
-  padding: 15px 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 30px;
   background: #F97316;
   color: white;
   border-radius: 5px;
   text-decoration: none;
   font-size: 1.2rem;
   font-weight: 500;
-  transition: background 0.3s, transform 0.3s;
+  transition: all 0.3s;
 }
 
 .cta-btn:hover {
   background: #EA580C;
-  transform: translateY(-3px);
+  transform: translateY(-2px);
 }
 
 /* Features Section */
 .features-section {
-  padding: 60px 20px;
+  padding: 20px 20px;
   text-align: center;
   background: #F9FAFB;
 }
@@ -205,7 +228,7 @@ export default {
   padding: 30px;
   border-radius: 10px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s, box-shadow 0.3s;
+  transition: all 0.3s;
   animation: fadeIn 1.2s ease-out;
 }
 
@@ -214,10 +237,20 @@ export default {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 }
 
-.feature-card i {
-  font-size: 2.5rem;
+.feature-icon {
+  width: 60px;
+  height: 60px;
+  background: #EFF6FF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+.feature-icon i {
+  font-size: 1.8rem;
   color: #2563EB;
-  margin-bottom: 15px;
 }
 
 .feature-card h3 {
@@ -233,15 +266,26 @@ export default {
 }
 
 .feature-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: #2563EB;
   text-decoration: none;
   font-weight: 500;
-  transition: color 0.3s;
+  transition: all 0.3s;
 }
 
 .feature-link:hover {
   color: #1E40AF;
+  gap: 12px;
+}
+
+.feature-link i {
+  transition: transform 0.3s;
+}
+
+.feature-link:hover i {
+  transform: translateX(5px);
 }
 
 /* Modal Styles */
@@ -267,7 +311,7 @@ export default {
   max-width: 500px;
   text-align: center;
   position: relative;
-  animation: modalFadeIn 0.3s ease-out;
+  animation: fadeIn 0.3s ease-out;
 }
 
 .modal-content h3 {
@@ -289,14 +333,17 @@ export default {
 }
 
 .modal-btn {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   padding: 12px 20px;
   border-radius: 5px;
   font-family: 'Kanit', sans-serif;
   font-size: 1rem;
   font-weight: 500;
   text-decoration: none;
-  transition: background 0.3s, transform 0.3s, box-shadow 0.3s;
+  transition: all 0.3s;
 }
 
 .add-seat-btn {
@@ -307,7 +354,6 @@ export default {
 .add-seat-btn:hover {
   background: #1E40AF;
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
 }
 
 .open-course-btn {
@@ -318,7 +364,6 @@ export default {
 .open-course-btn:hover {
   background: #EA580C;
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3);
 }
 
 .close-btn {
@@ -361,8 +406,8 @@ export default {
   }
 
   .cta-btn {
-    padding: 12px 30px;
-    font-size: 1rem;
+    padding: 10px 25px;
+    font-size: 1.1rem;
   }
 
   .features-section h2 {

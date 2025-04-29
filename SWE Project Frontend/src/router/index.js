@@ -5,6 +5,7 @@ import AddSeat from '../views/AddSeat.vue';
 import OpenCourse from '../views/OpenCourse.vue';
 import Status from '../views/Status.vue';
 import Profile from '../views/Profile.vue';
+import GeneralRequest from '../views/GeneralRequest.vue';
 
 const routes = [
   {
@@ -25,9 +26,14 @@ const routes = [
   {
     path: '/request',
     name: 'Request',
-    redirect: '/request/add-seat',
+    redirect: '/request/general',
     meta: { requiresAuth: true }, // ต้องล็อกอินก่อน
     children: [
+      {
+        path: 'general',
+        name: 'GeneralRequest',
+        component: GeneralRequest,
+      },
       {
         path: 'add-seat',
         name: 'AddSeat',

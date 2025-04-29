@@ -234,6 +234,39 @@
             <button class="modal-close-btn" @click="closeModal">
               <i class="fas fa-times-circle"></i> ปิด
             </button>
+            <button class="modal-close-btn2" @click="cancelRequest">
+              <i class="fas fa-times-circle"></i> ยกเลิกคำร้อง
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notification -->
+      <div v-if="showNotification" class="notification" :class="notificationType">
+        <i :class="notificationIcon"></i>
+        <span>{{ notificationMessage }}</span>
+        <button class="notification-close" @click="closeNotification">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <!-- Confirm Cancel Modal -->
+      <div v-if="showConfirmModal" class="confirm-modal-overlay" @click="closeConfirmModal">
+        <div class="confirm-modal-content" @click.stop>
+          <div class="confirm-modal-header">
+            <h3><i class="fas fa-exclamation-circle"></i> ยืนยันการยกเลิก</h3>
+          </div>
+          <div class="confirm-modal-body">
+            <p>คุณแน่ใจหรือไม่ว่าต้องการยกเลิกคำร้องนี้?</p>
+            <p class="highlight">{{ `${selectedRequest.courseCode} - ${selectedRequest.courseTitle}` }}</p>
+          </div>
+          <div class="confirm-modal-footer">
+            <button class="confirm-btn" @click="confirmCancel">
+              <i class="fas fa-check"></i> ยืนยัน
+            </button>
+            <button class="cancel-btn" @click="closeConfirmModal">
+              <i class="fas fa-times"></i> ยกเลิก
+            </button>
           </div>
         </div>
       </div>
@@ -252,7 +285,13 @@ export default {
       isLoading: false,
       errorMessage: '',
       showModal: false,
+      showConfirmModal: false,
       selectedRequest: null,
+      // Notification data
+      showNotification: false,
+      notificationMessage: '',
+      notificationType: 'success',
+      notificationIcon: 'fas fa-check-circle',
       user: {
         name: '',
         studentId: '',
@@ -387,6 +426,68 @@ export default {
       // Return class based on request status
       if (status === 'draft') return 'status-draft';
       return 'status-pending';
+    },
+    cancelRequest() {
+      // แสดงป็อปอัพยืนยัน
+      this.showConfirmModal = true;
+    },
+    closeConfirmModal() {
+      this.showConfirmModal = false;
+    },
+    async confirmCancel() {
+      try {
+        // ตรวจสอบว่า selectedRequest มีค่าและมี _id
+        if (!this.selectedRequest || !this.selectedRequest._id) {
+          throw new Error('ไม่พบข้อมูลคำร้องที่เลือก');
+        }
+
+        // กำหนด endpoint ตามประเภทคำร้อง
+        const endpoint =
+          this.selectedRequest.requestType === 'คำร้องขอเปิดรายวิชานอกแผน'
+            ? `http://localhost:3000/api/opencourserequests/${this.selectedRequest._id}`
+            : `http://localhost:3000/api/addseatrequests/${this.selectedRequest._id}`;
+
+        // ส่งคำขอ DELETE ไปยัง backend
+        await axios.delete(endpoint);
+
+        // แสดง notification
+        this.showNotification = true;
+        this.notificationMessage = 'ยกเลิกคำร้องสำเร็จ';
+        this.notificationType = 'success';
+        this.notificationIcon = 'fas fa-check-circle';
+
+        // ลบคำร้องออกจาก state
+        this.requestHistory = this.requestHistory.filter(
+          request => request._id !== this.selectedRequest._id
+        );
+
+        // ปิด modals ทั้งสอง
+        this.closeConfirmModal();
+        this.closeModal();
+
+        // Auto-hide notification หลัง 5 วินาที
+        setTimeout(() => {
+          this.closeNotification();
+        }, 5000);
+      } catch (error) {
+        console.error('เกิดข้อผิดพลาดในการยกเลิกคำร้อง:', error);
+        // แสดง notification ข้อผิดพลาด
+        this.showNotification = true;
+        this.notificationMessage = 'ไม่สามารถยกเลิกคำร้องได้ กรุณาลองใหม่';
+        this.notificationType = 'error';
+        this.notificationIcon = 'fas fa-exclamation-circle';
+
+        // ปิด confirm modal
+        this.closeConfirmModal();
+
+        // Auto-hide notification หลัง 5 วินาที
+        setTimeout(() => {
+          this.closeNotification();
+        }, 5000);
+      }
+    },
+    closeNotification() {
+      this.showNotification = false;
     }
   }
 };
@@ -467,57 +568,148 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 30px;
-  padding: 20px;
-  background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  animation: fadeIn 0.8s ease-out;
+  padding: 25px;
+  background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+  border-radius: 15px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  position: relative;
+  overflow: hidden;
+  animation: slideDown 0.5s ease-out;
+}
+
+.profile-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #4CAF50, #1a73e8);
+  animation: progress 2s ease-in-out infinite;
 }
 
 .header-content {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 20px;
+  position: relative;
+  z-index: 1;
 }
 
 .logo {
-  width: 60px;
-  height: 60px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
-  animation: scaleUp 0.5s ease-in-out infinite alternate;
+  background: white;
+  padding: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s;
+}
+
+.logo:hover {
+  transform: scale(1.05);
+}
+
+.header-text {
+  color: white;
 }
 
 .header-text h1 {
   margin: 0;
-  font-size: 1.8rem;
-  color: #2563eb;
+  font-size: 2rem;
+  font-weight: 600;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  animation: fadeIn 0.8s ease-out;
 }
 
 .header-text p {
-  margin: 5px 0 0;
-  font-size: 1rem;
-  color: #6b7280;
+  margin: 8px 0 0;
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.9);
+  animation: fadeIn 0.8s ease-out 0.2s backwards;
 }
 
 .back-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: #f9fafb;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+  gap: 10px;
+  padding: 12px 25px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 30px;
   font-family: 'Kanit', sans-serif;
-  font-size: 1rem;
-  color: #1f2937;
+  font-size: 1.1rem;
+  color: white;
   cursor: pointer;
-  transition: background 0.3s, transform 0.3s, box-shadow 0.3s;
+  transition: all 0.3s;
+  backdrop-filter: blur(5px);
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.back-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.2));
+  transform: translateX(-100%);
+  transition: transform 0.3s;
+  z-index: -1;
 }
 
 .back-btn:hover {
-  background: #e5e7eb;
+  background: rgba(255, 255, 255, 0.2);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.back-btn:hover::before {
+  transform: translateX(0);
+}
+
+.back-btn i {
+  font-size: 1.2rem;
+  transition: transform 0.3s;
+}
+
+.back-btn:hover i {
+  transform: translateX(-5px);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes progress {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 0%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Profile Container Styling */
@@ -853,18 +1045,38 @@ td {
 .modal-footer {
   padding: 15px 25px;
   text-align: right;
-  background: rgba(249, 250, 251, 0.95);
+  background: rgba(245, 247, 250, 0.95);
   border-bottom-left-radius: 20px;
   border-bottom-right-radius: 20px;
   position: sticky;
   bottom: 0;
   z-index: 10;
+  display: flex;
+  justify-content: space-between;
 }
 
 .modal-close-btn {
   padding: 12px 30px;
   background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
   color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Kanit', sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.modal-close-btn2 {
+  padding: 12px 30px;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
   border: none;
   border-radius: 10px;
   font-family: 'Kanit', sans-serif;
@@ -898,6 +1110,30 @@ td {
 }
 
 .modal-close-btn:active::before {
+  width: 200px;
+  height: 200px;
+  animation: ripple 0.6s ease-out;
+}
+
+.modal-close-btn2:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+}
+
+.modal-close-btn2::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.6s ease, height 0.6s ease;
+}
+
+.modal-close-btn2:active::before {
   width: 200px;
   height: 200px;
   animation: ripple 0.6s ease-out;
@@ -955,6 +1191,216 @@ td {
 
   .modal-close-btn {
     padding: 10px 25px;
+  }
+}
+
+/* Notification Styling */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 15px 20px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  z-index: 2000;
+  animation: slideIn 0.5s ease-out, fadeOut 0.5s ease-in 4.5s forwards;
+  max-width: 400px;
+}
+
+.notification.success {
+  background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+  color: white;
+}
+
+.notification.error {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+}
+
+.notification.warning {
+  background: linear-gradient(135deg, #f39c12 0%, #d35400 100%);
+  color: white;
+}
+
+.notification i {
+  font-size: 1.2rem;
+}
+
+.notification span {
+  font-size: 1rem;
+  font-weight: 500;
+  flex: 1;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0.8;
+  transition: opacity 0.3s;
+}
+
+.notification-close:hover {
+  opacity: 1;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Confirm Modal Styling */
+.confirm-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  animation: modalFade 0.3s ease-out;
+}
+
+.confirm-modal-content {
+  background: white;
+  border-radius: 10px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  animation: modalGlow 0.5s ease-out;
+}
+
+.confirm-modal-header {
+  padding: 15px 20px;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+
+.confirm-modal-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.confirm-modal-body {
+  padding: 20px;
+  text-align: center;
+}
+
+.confirm-modal-body p {
+  font-size: 1rem;
+  font-weight: 400;
+  color: #333;
+  margin: 0 0 10px;
+}
+
+.confirm-modal-body p.highlight {
+  font-weight: 500;
+  color: #2563eb;
+}
+
+.confirm-modal-footer {
+  padding: 15px 20px;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+.confirm-btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Kanit', sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.confirm-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
+}
+
+.cancel-btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Kanit', sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.cancel-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+}
+
+/* Responsive Design for Notification and Confirm Modal */
+@media (max-width: 768px) {
+  .notification {
+    width: 90%;
+    right: 5%;
+  }
+
+  .confirm-modal-content {
+    width: 95%;
+  }
+
+  .confirm-modal-header h3 {
+    font-size: 1.1rem;
+  }
+
+  .confirm-modal-body p {
+    font-size: 0.95rem;
+  }
+
+  .confirm-btn,
+  .cancel-btn {
+    padding: 8px 15px;
+    font-size: 0.9rem;
   }
 }
 </style>

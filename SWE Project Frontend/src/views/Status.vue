@@ -528,61 +528,139 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 30px;
-  padding: 20px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  animation: fadeIn 0.8s ease-out;
+  padding: 25px;
+  background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+  border-radius: 15px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  position: relative;
+  overflow: hidden;
+  animation: slideDown 0.5s ease-out;
+}
+
+.status-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #4CAF50, #1a73e8);
+  animation: progress 2s ease-in-out infinite;
 }
 
 .header-content {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 20px;
+  position: relative;
+  z-index: 1;
 }
 
 .logo {
-  width: 60px;
-  height: 60px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
+  background: white;
+  padding: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s;
+}
+
+.logo:hover {
+  transform: scale(1.05);
+}
+
+.header-text {
+  color: white;
 }
 
 .header-text h1 {
   margin: 0;
-  font-size: 1.8rem;
+  font-size: 2rem;
   font-weight: 600;
-  color: #1a73e8;
-  line-height: 1.5;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  animation: fadeIn 0.8s ease-out;
 }
 
 .header-text p {
-  margin: 5px 0 0;
-  font-size: 1rem;
-  font-weight: 400;
-  color: #666;
-  line-height: 1.5;
+  margin: 8px 0 0;
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.9);
+  animation: fadeIn 0.8s ease-out 0.2s backwards;
 }
 
 .back-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: #f1f3f5;
-  border: none;
-  border-radius: 5px;
+  gap: 10px;
+  padding: 12px 25px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 30px;
   font-family: 'Kanit', sans-serif;
-  font-size: 1rem;
-  font-weight: 500;
-  color: #333;
+  font-size: 1.1rem;
+  color: white;
   cursor: pointer;
-  transition: background 0.3s, transform 0.3s, box-shadow 0.3s;
+  transition: all 0.3s;
+  backdrop-filter: blur(5px);
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.back-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.2));
+  transform: translateX(-100%);
+  transition: transform 0.3s;
+  z-index: -1;
 }
 
 .back-btn:hover {
-  background: #e0e0e0;
+  background: rgba(255, 255, 255, 0.2);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.back-btn:hover::before {
+  transform: translateX(0);
+}
+
+.back-btn i {
+  font-size: 1.2rem;
+  transition: transform 0.3s;
+}
+
+.back-btn:hover i {
+  transform: translateX(-5px);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes progress {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 0%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
 }
 
 .status-body {
