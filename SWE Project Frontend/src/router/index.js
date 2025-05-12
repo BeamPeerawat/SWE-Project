@@ -10,7 +10,6 @@ import GeneralRequest from '../views/GeneralRequest.vue';
 import AdvisorHome from '../views/AdvisorHome.vue';
 import AdvisorRequestDetail from '../views/AdvisorRequestDetail.vue';
 import AdvisorProfile from '../views/AdvisorProfile.vue';
-// เพิ่มเส้นทางสำหรับบทบาทอื่นๆ (ยังไม่ได้สร้างหน้า)
 import InstructorHome from '../views/InstructorHome.vue';
 import InstructorRequestDetail from '../views/InstructorRequestDetail.vue';
 import InstructorProfile from '../views/InstructorProfile.vue';
@@ -127,25 +126,25 @@ const routes = [
   {
     path: '/head',
     redirect: '/head/home',
-    meta: { requiresAuth: true, role: 'headofdept' },
+    meta: { requiresAuth: true, role: 'head' },
   },
   {
     path: '/head/home',
     name: 'HeadHome',
     component: HeadHome,
-    meta: { requiresAuth: true, role: 'headofdept' },
+    meta: { requiresAuth: true, role: 'head' },
   },
   {
     path: '/head/request/:id',
     name: 'HeadRequestDetail',
     component: HeadRequestDetail,
-    meta: { requiresAuth: true, role: 'headofdept' },
+    meta: { requiresAuth: true, role: 'head' },
   },
   {
     path: '/head/profile',
     name: 'HeadProfile',
     component: HeadProfile,
-    meta: { requiresAuth: true, role: 'headofdept' },
+    meta: { requiresAuth: true, role: 'head' },
   },
 
   {
@@ -206,7 +205,7 @@ router.beforeEach((to, from, next) => {
       next('/advisor/home');
     } else if (user.role === 'instructor') {
       next('/instructor/home');
-    } else if (user.role === 'headofdept') {
+    } else if (user.role === 'head') {
       next('/head/home');
     } else if (user.role === 'admin') {
       next('/admin/dashboard');
@@ -218,7 +217,7 @@ router.beforeEach((to, from, next) => {
       next('/advisor/home');
     } else if (user.role === 'instructor') {
       next('/instructor/home');
-    } else if (user.role === 'headofdept') {
+    } else if (user.role === 'head') {
       next('/head/home');
     } else if (user.role === 'admin') {
       next('/admin/dashboard');
