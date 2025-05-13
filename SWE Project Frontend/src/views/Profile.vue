@@ -19,7 +19,11 @@
       <!-- User Info Section -->
       <div class="profile-section user-info">
         <h2>ข้อมูลส่วนตัว</h2>
-        <div class="info-grid">
+        <div v-if="isLoadingUser" class="loading">กำลังโหลดข้อมูลผู้ใช้...</div>
+        <div v-else-if="errorMessageUser" class="error-message">
+          {{ errorMessageUser }}
+        </div>
+        <div v-else class="info-grid">
           <div class="info-item">
             <label>ชื่อ-นามสกุล:</label>
             <p v-if="!isEditing">{{ user.name || 'ยังไม่ได้ระบุ' }}</p>
@@ -33,11 +37,11 @@
           </div>
           <div class="info-item">
             <label>รหัสนักศึกษา:</label>
-            <p v-if="!isEditing">{{ user.studentId || 'ยังไม่ได้ระบุ' }}</p>
+            <p v-if="!isEditing">{{ user.student_no || 'ยังไม่ได้ระบุ' }}</p>
             <input
               v-else
               type="text"
-              v-model="editUser.studentId"
+              v-model="editUser.student_no"
               placeholder="รหัสนักศึกษา"
               required
             />
@@ -55,14 +59,18 @@
           </div>
           <div class="info-item">
             <label>สาขาวิชา:</label>
-            <p v-if="!isEditing">{{ user.fieldOfStudy || 'ยังไม่ได้ระบุ' }}</p>
+            <p v-if="!isEditing">{{ user.branch || 'ยังไม่ได้ระบุ' }}</p>
             <input
               v-else
               type="text"
-              v-model="editUser.fieldOfStudy"
+              v-model="editUser.branch"
               placeholder="สาขาวิชา"
               required
             />
+          </div>
+          <div class="info-item">
+            <label>ชั้นปี:</label>
+            <p>{{ user.group || 'ยังไม่ได้ระบุ' }}</p>
           </div>
           <div class="info-item">
             <label>อีเมล:</label>
@@ -72,7 +80,7 @@
               type="email"
               v-model="editUser.email"
               placeholder="อีเมล"
-              required
+              disabled
             />
           </div>
           <div class="info-item">
@@ -275,88 +283,94 @@
 </template>
 
 <script>
-import axios from 'axios';
-
 export default {
   name: 'ProfilePage',
   data() {
     return {
       isEditing: false,
       isLoading: false,
+      isLoadingUser: false,
       errorMessage: '',
+      errorMessageUser: '',
       showModal: false,
       showConfirmModal: false,
       selectedRequest: null,
-      // Notification data
       showNotification: false,
       notificationMessage: '',
       notificationType: 'success',
       notificationIcon: 'fas fa-check-circle',
       user: {
         name: '',
-        studentId: '',
+        student_no: '',
         faculty: '',
-        fieldOfStudy: '',
+        branch: '',
+        group: '',
         email: '',
-        contactNumber: ''
+        contactNumber: '',
       },
       editUser: {
         name: '',
-        studentId: '',
+        student_no: '',
         faculty: '',
-        fieldOfStudy: '',
+        branch: '',
         email: '',
-        contactNumber: ''
+        contactNumber: '',
       },
-      requestHistory: []
+      requestHistory: [],
     };
   },
   async mounted() {
-    // Load user data from localStorage
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      this.user = JSON.parse(storedUser);
-    }
-    // Fetch request history from backend
+    await this.fetchUserData();
     await this.fetchRequestHistory();
   },
   methods: {
+    async fetchUserData() {
+      this.isLoadingUser = true;
+      this.errorMessageUser = '';
+      try {
+        const response = await this.$axios.get('/api/auth/user');
+        this.user = response.data.user;
+        localStorage.setItem('user', JSON.stringify(this.user));
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        this.errorMessageUser = 'เกิดข้อผิดพลาดในการโหลดข้อมูลผู้ใช้ กรุณาล็อกอินใหม่';
+        if (error.response?.status === 401) {
+          setTimeout(() => {
+            localStorage.removeItem('user');
+            this.$router.push('/login');
+          }, 2000);
+        }
+      } finally {
+        this.isLoadingUser = false;
+      }
+    },
     async fetchRequestHistory() {
       this.isLoading = true;
       this.errorMessage = '';
       try {
-        // ดึงข้อมูลผู้ใช้จาก localStorage
         const userData = JSON.parse(localStorage.getItem('user'));
         if (!userData || !userData.email || !userData._id) {
           throw new Error('ไม่พบข้อมูลผู้ใช้หรือข้อมูลไม่ครบถ้วน');
         }
 
-        console.log('Fetching request history for:', userData.email, userData._id); // ดีบั๊ก
-
-        // ดึงข้อมูลจากทั้งสอง endpoints พร้อมกัน
         const [openCourseResponse, addSeatResponse] = await Promise.all([
-          axios.get(`http://localhost:3000/api/opencourserequests?email=${userData.email}`),
-          axios.get(`http://localhost:3000/api/addseatrequests?email=${userData.email}`)
+          this.$axios.get(`/api/opencourserequests?email=${userData.email}`),
+          this.$axios.get(`/api/addseatrequests?email=${userData.email}`),
         ]);
 
-        // แปลงข้อมูลจาก opencourserequests
         const openCourseRequests = openCourseResponse.data.map(request => ({
           ...request,
-          requestType: 'คำร้องขอเปิดรายวิชานอกแผน'
+          requestType: 'คำร้องขอเปิดรายวิชานอกแผน',
         }));
 
-        // แปลงข้อมูลจาก addseatrequests
         const addSeatRequests = addSeatResponse.data.map(request => ({
           ...request,
-          requestType: 'คำร้องขอเพิ่มที่นั่ง'
+          requestType: 'คำร้องขอเพิ่มที่นั่ง',
         }));
 
-        // รวมข้อมูลและกรองโดย email เพื่อความมั่นใจ
         this.requestHistory = [...openCourseRequests, ...addSeatRequests]
           .filter(request => request.email === userData.email)
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-        console.log('Fetched request history:', this.requestHistory); // ดีบั๊ก
       } catch (error) {
         console.error('เกิดข้อผิดพลาดในการดึงข้อมูล:', error);
         this.errorMessage = 'เกิดข้อผิดพลาดในการโหลดประวัติคำร้อง กรุณาลองใหม่';
@@ -365,70 +379,100 @@ export default {
       }
     },
     formatDate(dateString) {
-      // Format MongoDB createdAt date to DD-MM-YYYY
       const date = new Date(dateString);
       return date.toLocaleDateString('th-TH', {
         day: '2-digit',
         month: '2-digit',
-        year: 'numeric'
+        year: 'numeric',
       });
     },
     formatStatus(status) {
-      // Map database status to user-friendly text
       return status === 'draft' ? 'ร่าง' : 'รอพิจารณา';
     },
     editProfile() {
-      // Enter edit mode and populate editUser with current user data
-      this.editUser = { ...this.user };
+      this.editUser = {
+        name: this.user.name,
+        student_no: this.user.student_no,
+        faculty: this.user.faculty,
+        branch: this.user.branch,
+        email: this.user.email,
+        contactNumber: this.user.contactNumber,
+      };
       this.isEditing = true;
     },
-    saveProfile() {
+    async saveProfile() {
       // Validate contact number
-      if (this.editUser.contactNumber.length !== 10) {
-        alert('กรุณากรอกเบอร์โทรศัพท์ 10 หลัก');
+      if (this.editUser.contactNumber && this.editUser.contactNumber.length !== 10) {
+        this.showNotification = true;
+        this.notificationMessage = 'กรุณากรอกเบอร์โทรศัพท์ 10 หลัก';
+        this.notificationType = 'error';
+        this.notificationIcon = 'fas fa-exclamation-circle';
+        setTimeout(() => {
+          this.closeNotification();
+        }, 5000);
         return;
       }
-      // Update user data
-      this.user = { ...this.editUser };
-      // Save to localStorage
-      localStorage.setItem('user', JSON.stringify(this.user));
-      // Exit edit mode
-      this.isEditing = false;
-      alert('บันทึกข้อมูลเรียบร้อยแล้ว!');
+      try {
+        // Prepare update payload (exclude group)
+        const updateData = {
+          name: this.editUser.name,
+          student_no: this.editUser.student_no,
+          faculty: this.editUser.faculty,
+          branch: this.editUser.branch,
+          contactNumber: this.editUser.contactNumber || '',
+        };
+        // Send update to backend
+        const response = await this.$axios.put(`/api/user/${this.user.email}`, updateData);
+        // Update local user data
+        this.user = response.data;
+        localStorage.setItem('user', JSON.stringify(this.user));
+        this.isEditing = false;
+        // Show success notification
+        this.showNotification = true;
+        this.notificationMessage = 'บันทึกข้อมูลเรียบร้อยแล้ว!';
+        this.notificationType = 'success';
+        this.notificationIcon = 'fas fa-check-circle';
+        setTimeout(() => {
+          this.closeNotification();
+        }, 5000);
+      } catch (error) {
+        console.error('Error saving profile:', error);
+        this.showNotification = true;
+        this.notificationMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่';
+        this.notificationType = 'error';
+        this.notificationIcon = 'fas fa-exclamation-circle';
+        setTimeout(() => {
+          this.closeNotification();
+        }, 5000);
+      }
     },
     cancelEdit() {
-      // Exit edit mode without saving
       this.isEditing = false;
       this.editUser = {
         name: '',
-        studentId: '',
+        student_no: '',
         faculty: '',
-        fieldOfStudy: '',
+        branch: '',
         email: '',
-        contactNumber: ''
+        contactNumber: '',
       };
     },
     restrictToNumbers(event) {
-      // Restrict contact number to numeric characters
       this.editUser.contactNumber = event.target.value.replace(/[^0-9]/g, '');
     },
     viewRequest(request) {
-      // Show modal with request details
       this.selectedRequest = request;
       this.showModal = true;
     },
     closeModal() {
-      // Hide modal and clear selected request
       this.showModal = false;
       this.selectedRequest = null;
     },
     getStatusClass(status) {
-      // Return class based on request status
       if (status === 'draft') return 'status-draft';
       return 'status-pending';
     },
     cancelRequest() {
-      // แสดงป็อปอัพยืนยัน
       this.showConfirmModal = true;
     },
     closeConfirmModal() {
@@ -436,51 +480,33 @@ export default {
     },
     async confirmCancel() {
       try {
-        // ตรวจสอบว่า selectedRequest มีค่าและมี _id
         if (!this.selectedRequest || !this.selectedRequest._id) {
           throw new Error('ไม่พบข้อมูลคำร้องที่เลือก');
         }
-
-        // กำหนด endpoint ตามประเภทคำร้อง
         const endpoint =
           this.selectedRequest.requestType === 'คำร้องขอเปิดรายวิชานอกแผน'
-            ? `http://localhost:3000/api/opencourserequests/${this.selectedRequest._id}`
-            : `http://localhost:3000/api/addseatrequests/${this.selectedRequest._id}`;
-
-        // ส่งคำขอ DELETE ไปยัง backend
-        await axios.delete(endpoint);
-
-        // แสดง notification
+            ? `/api/opencourserequests/${this.selectedRequest._id}`
+            : `/api/addseatrequests/${this.selectedRequest._id}`;
+        await this.$axios.delete(endpoint);
         this.showNotification = true;
         this.notificationMessage = 'ยกเลิกคำร้องสำเร็จ';
         this.notificationType = 'success';
         this.notificationIcon = 'fas fa-check-circle';
-
-        // ลบคำร้องออกจาก state
         this.requestHistory = this.requestHistory.filter(
           request => request._id !== this.selectedRequest._id
         );
-
-        // ปิด modals ทั้งสอง
         this.closeConfirmModal();
         this.closeModal();
-
-        // Auto-hide notification หลัง 5 วินาที
         setTimeout(() => {
           this.closeNotification();
         }, 5000);
       } catch (error) {
         console.error('เกิดข้อผิดพลาดในการยกเลิกคำร้อง:', error);
-        // แสดง notification ข้อผิดพลาด
         this.showNotification = true;
         this.notificationMessage = 'ไม่สามารถยกเลิกคำร้องได้ กรุณาลองใหม่';
         this.notificationType = 'error';
         this.notificationIcon = 'fas fa-exclamation-circle';
-
-        // ปิด confirm modal
         this.closeConfirmModal();
-
-        // Auto-hide notification หลัง 5 วินาที
         setTimeout(() => {
           this.closeNotification();
         }, 5000);
@@ -488,8 +514,8 @@ export default {
     },
     closeNotification() {
       this.showNotification = false;
-    }
-  }
+    },
+  },
 };
 </script>
 
@@ -770,7 +796,8 @@ export default {
   line-height: 1.5;
 }
 
-.info-item input {
+.info-item input,
+.info-item select {
   width: 100%;
   padding: 10px;
   border: 1px solid #d1d5db;
@@ -781,7 +808,8 @@ export default {
   transition: border-color 0.3s, box-shadow 0.3s;
 }
 
-.info-item input:focus {
+.info-item input:focus,
+.info-item select:focus {
   border-color: #2563eb;
   box-shadow: 0 0 8px rgba(37, 99, 235, 0.2);
   outline: none;

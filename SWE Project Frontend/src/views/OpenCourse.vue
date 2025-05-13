@@ -91,7 +91,7 @@
           </div>
           <div class="form-group">
             <label>ระดับการศึกษา:</label>
-             <div class="checkbox-group">
+            <div class="checkbox-group">
               <label><input type="radio" v-model="form.levelOfStudy" value="Certificate" /><span>ประกาศนียบัตร</span></label>
               <label><input type="radio" v-model="form.levelOfStudy" value="Diploma" /><span>อนุปริญญา</span></label>
               <label><input type="radio" v-model="form.levelOfStudy" value="Undergraduate" /><span>ปริญญาตรี</span></label>
@@ -127,12 +127,12 @@
                   <td>
                     <select v-model="form.courseCode" @change="updateCourseDetails" required>
                       <option value="">เลือกวิชา</option>
-                      <option v-for="course in courses" :key="course._id" :value="course.subjectCode">
-                        {{ course.subjectCode }}
+                      <option v-for="subject in subjects" :key="subject._id" :value="subject.subjectCode">
+                        {{ subject.subjectCode }} - {{ subject.subjectNameTH || 'ไม่ระบุ' }}
                       </option>
                     </select>
                   </td>
-                  <td><input type="text" v-model="form.courseTitle" placeholder="ชื่อวิชา" readonly /></td>
+                  <td><input type="text" v-model="form.courseTitle" placeholder="ชื่อวิชาภาษาอังกฤษ" readonly /></td>
                   <td><input type="text" v-model="form.credits" placeholder="หน่วยกิต" readonly /></td>
                 </tr>
               </tbody>
@@ -236,7 +236,7 @@ export default {
         email: '',
         signature: ''
       },
-      courses: [],
+      subjects: [],
       drafts: [],
       draftCount: 0,
       showDraftsModal: false,
@@ -260,7 +260,7 @@ export default {
       // กรอกข้อมูลฟอร์มอัตโนมัติ
       this.form.studentName = this.user.name || '';
       this.form.email = this.user.email || '';
-      this.form.studentId = this.user.studentId || '';
+      this.form.studentId = this.user.student_no || '';
       this.form.signature = this.user.name || '';
     } else {
       // ถ้าไม่ล็อกอิน redirect ไป login
@@ -269,19 +269,19 @@ export default {
     }
   },
   async mounted() {
-    await this.fetchCourses();
+    await this.fetchSubjects();
     await this.fetchDrafts();
   },
   methods: {
-    async fetchCourses() {
+    async fetchSubjects() {
       try {
         const response = await axios.get('/api/subjects');
-        this.courses = response.data;
+        this.subjects = response.data;
         if (response.data.length === 0) {
           this.showPopupMessage('ไม่พบข้อมูลรายวิชาในระบบ กรุณาติดต่อผู้ดูแล');
         }
       } catch (error) {
-        console.error('Error fetching courses:', error.response?.data || error.message);
+        console.error('Error fetching subjects:', error.response?.data || error.message);
         let errorMessage = 'เกิดข้อผิดพลาดในการโหลดรายวิชา กรุณาตรวจสอบการเชื่อมต่อ backend';
         if (error.response?.status === 404) {
           errorMessage = 'ไม่พบ endpoint รายวิชา กรุณาตรวจสอบ Backend';
@@ -337,10 +337,10 @@ export default {
       });
     },
     updateCourseDetails() {
-      const selectedCourse = this.courses.find(course => course.subjectCode === this.form.courseCode);
-      if (selectedCourse) {
-        this.form.courseTitle = selectedCourse.subjectName;
-        this.form.credits = selectedCourse.credits.toString();
+      const selectedSubject = this.subjects.find(subject => subject.subjectCode === this.form.courseCode);
+      if (selectedSubject) {
+        this.form.courseTitle = selectedSubject.subjectNameEN || 'ไม่ระบุ';
+        this.form.credits = selectedSubject.credits ? selectedSubject.credits.toString() : '0';
       } else {
         this.form.courseTitle = '';
         this.form.credits = '';
@@ -382,6 +382,11 @@ export default {
         return;
       }
 
+      if (!this.form.courseCode) {
+        this.showPopupMessage('กรุณาเลือกรายวิชาก่อนยื่นคำร้อง');
+        return;
+      }
+
       try {
         const response = await axios.post('/api/opencourserequests/submit', {
           ...this.form,
@@ -404,7 +409,7 @@ export default {
           userId: this.user?._id
         });
         console.log('Draft saved:', response.data);
-        this.draftCount = response.data.draftCount;
+        await this.fetchDrafts();
         this.showPopupMessage(`บันทึกแบบร่างสำเร็จ! คุณมีแบบร่างทั้งหมด ${this.draftCount} ฉบับ`);
       } catch (error) {
         console.error('Error saving draft:', error.response?.data || error.message);

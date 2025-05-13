@@ -136,11 +136,11 @@
                     <select v-model="form.courseCode" @change="updateCourseDetails" required>
                       <option value="">เลือกวิชา</option>
                       <option v-for="subject in subjects" :key="subject._id" :value="subject.subjectCode">
-                        {{ subject.subjectCode }}
+                        {{ subject.subjectCode }} - {{ subject.subjectNameTH || 'ไม่ระบุ' }}
                       </option>
                     </select>
                   </td>
-                  <td><input type="text" v-model="form.courseTitle" placeholder="ชื่อวิชา" readonly /></td>
+                  <td><input type="text" v-model="form.courseTitle" placeholder="ชื่อวิชาภาษาอังกฤษ" readonly /></td>
                   <td><input type="text" v-model="form.section" placeholder="ตอนเรียน" required /></td>
                   <td><input type="text" v-model="form.credits" placeholder="หน่วยกิต" readonly /></td>
                   <td><input type="text" v-model="form.day" placeholder="วัน" required /></td>
@@ -273,8 +273,9 @@ export default {
       // กรอกข้อมูลฟอร์มอัตโนมัติ
       this.form.studentName = this.user.name || '';
       this.form.email = this.user.email || '';
-      this.form.studentId = this.user.studentId || '';
+      this.form.studentId = this.user.student_no || '';
       this.form.signature = this.user.name || '';
+      this.form.classLevel = this.user.group || '';
     } else {
       // ถ้าไม่ล็อกอิน redirect ไป login
       this.showPopupMessage('กรุณาล็อกอินก่อนยื่นคำร้อง');
@@ -344,8 +345,8 @@ export default {
     updateCourseDetails() {
       const selectedSubject = this.subjects.find(subject => subject.subjectCode === this.form.courseCode);
       if (selectedSubject) {
-        this.form.courseTitle = selectedSubject.subjectName;
-        this.form.credits = selectedSubject.credits.toString();
+        this.form.courseTitle = selectedSubject.subjectNameEN || 'ไม่ระบุ';
+        this.form.credits = selectedSubject.credits ? selectedSubject.credits.toString() : '0';
       } else {
         this.form.courseTitle = '';
         this.form.credits = '';
@@ -386,6 +387,11 @@ export default {
         return;
       }
 
+      if (!this.form.courseCode) {
+        this.showPopupMessage('กรุณาเลือกรายวิชาก่อนยื่นคำร้อง');
+        return;
+      }
+
       try {
         const response = await axios.post('/api/addseatrequests', {
           ...this.form,
@@ -419,7 +425,7 @@ export default {
       return new Date(date).toLocaleDateString('th-TH', {
         year: 'numeric',
         month: 'long',
-        day: 'numeric'
+        day: 'numeric',
       });
     },
     showPopupMessage(message) {
@@ -673,11 +679,11 @@ export default {
   gap: 5px;
   font-weight: 400;
   font-size: 1rem;
-  white-space: nowrap; /* ป้องกันการตัดคำใน label */
+  white-space: nowrap;
 }
 
 .checkbox-group span {
-  white-space: nowrap; /* ป้องกันการตัดคำใน span เช่น "ปริญญาตรี" */
+  white-space: nowrap;
 }
 
 .course-table {
