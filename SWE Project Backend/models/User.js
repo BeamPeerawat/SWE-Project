@@ -31,6 +31,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: false,
   },
+  group: {
+    type: String,
+    required: false,
+    enum: ['1', '2', '3', '4', ''], // Allow empty string for unset
+  },
   role: {
     type: String,
     enum: ['student', 'instructor', 'advisor', 'head', 'admin'],

@@ -7,6 +7,7 @@ const apiRoutes = require('./routes/api');
 const subjectRoutes = require('./routes/subjectapi');
 const addSeatRequestRoutes = require('./routes/AddSeatRequestapi');
 const openCourseRequestRoutes = require('./routes/OpenCourseRequest');
+const generalRequestRoutes = require('./routes/GeneralRequestapi');
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use('/api', apiRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/addseatrequests', addSeatRequestRoutes);
 app.use('/api/opencourserequests', openCourseRequestRoutes);
+app.use('/api/generalrequests', generalRequestRoutes);
 
 // เริ่มเซิร์ฟเวอร์
 const PORT = process.env.PORT || 3000;

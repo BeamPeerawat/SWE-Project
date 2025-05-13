@@ -3,6 +3,18 @@ const router = express.Router();
 const passport = require('../config/passport');
 const User = require('../models/User');
 
+// Middleware to ensure user is authenticated and authorized
+const ensureAuthenticated = (req, res, next) => {
+  if (req.user) {
+    // Allow admins to update any user, or users to update their own profile
+    if (req.user.role === 'admin' || req.user.email === req.params.email) {
+      return next();
+    }
+    return res.status(403).json({ message: 'คุณไม่มีสิทธิ์อัปเดตข้อมูลผู้ใช้นี้' });
+  }
+  res.status(401).json({ message: 'ไม่ได้ล็อกอิน' });
+};
+
 // GET: ดึงข้อมูลผู้ใช้ทั้งหมด
 router.get('/users', async (req, res) => {
   try {
@@ -25,6 +37,7 @@ router.get('/user/:email', async (req, res) => {
       faculty: user.faculty,
       branch: user.branch,
       contactNumber: user.contactNumber,
+      group: user.group,
       name: user.name,
       email: user.email,
       role: user.role,
@@ -34,27 +47,42 @@ router.get('/user/:email', async (req, res) => {
   }
 });
 
-// PUT: อัปเดตข้อมูลผู้ใช้ (รวมถึง role)
-router.put('/user/:email', async (req, res) => {
+// PUT: อัปเดตข้อมูลผู้ใช้ (ไม่รวม group)
+router.put('/user/:email', ensureAuthenticated, async (req, res) => {
   try {
     const updates = {};
-    if (req.body.contactNumber) updates.contactNumber = req.body.contactNumber;
+    if (req.body.contactNumber) {
+      // Validate contactNumber: must be 10 digits
+      if (!/^\d{10}$/.test(req.body.contactNumber)) {
+        return res.status(400).json({ message: 'เบอร์โทรศัพท์ต้องมี 10 หลักและเป็นตัวเลขเท่านั้น' });
+      }
+      updates.contactNumber = req.body.contactNumber;
+    }
     if (req.body.name) updates.name = req.body.name;
     if (req.body.student_no) updates.student_no = req.body.student_no;
     if (req.body.faculty) updates.faculty = req.body.faculty;
     if (req.body.branch) updates.branch = req.body.branch;
-    if (req.body.role) updates.role = req.body.role;
+    if (req.body.role && req.user.role === 'admin') updates.role = req.body.role; // Only admins can update role
+
+    // Explicitly exclude group from updates
+    if (req.body.group) {
+      return res.status(400).json({ message: 'ไม่สามารถอัปเดตชั้นปีได้' });
+    }
 
     const user = await User.findOneAndUpdate(
       { email: req.params.email },
       { $set: updates },
-      { new: true, upsert: true }
+      { new: true }
     );
+    if (!user) {
+      return res.status(404).json({ message: 'ไม่พบผู้ใช้' });
+    }
     res.json({
       student_no: user.student_no,
       faculty: user.faculty,
       branch: user.branch,
       contactNumber: user.contactNumber,
+      group: user.group,
       name: user.name,
       email: user.email,
       role: user.role,
@@ -73,7 +101,8 @@ router.post('/users', async (req, res) => {
     faculty: req.body.faculty,
     branch: req.body.branch,
     contactNumber: req.body.contactNumber,
-    role: req.body.role || 'student', // ค่าเริ่มต้นเป็น student
+    group: req.body.group,
+    role: req.body.role || 'student',
   });
 
   try {
@@ -102,6 +131,7 @@ router.get(
       faculty: req.user.faculty,
       branch: req.user.branch,
       contactNumber: req.user.contactNumber,
+      group: req.user.group,
       role: req.user.role,
     };
     res.redirect(`http://localhost:8080/login?user=${encodeURIComponent(JSON.stringify(user))}`);
@@ -120,6 +150,7 @@ router.get('/auth/user', (req, res) => {
         faculty: req.user.faculty,
         branch: req.user.branch,
         contactNumber: req.user.contactNumber,
+        group: req.user.group,
         role: req.user.role,
       },
     });
@@ -129,11 +160,14 @@ router.get('/auth/user', (req, res) => {
 });
 
 // PATCH: เปลี่ยน role ของผู้ใช้
-router.patch('/user/:email/role', async (req, res) => {
+router.patch('/user/:email/role', ensureAuthenticated, async (req, res) => {
   try {
     const { role } = req.body;
     if (!['student', 'instructor', 'advisor', 'head', 'admin'].includes(role)) {
       return res.status(400).json({ message: 'role ไม่ถูกต้อง' });
+    }
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'เฉพาะผู้ดูแลระบบเท่านั้นที่เปลี่ยน role ได้' });
     }
     const user = await User.findOneAndUpdate(
       { email: req.params.email },
@@ -148,6 +182,7 @@ router.patch('/user/:email/role', async (req, res) => {
       faculty: user.faculty,
       branch: user.branch,
       contactNumber: user.contactNumber,
+      group: user.group,
       name: user.name,
       email: user.email,
       role: user.role,

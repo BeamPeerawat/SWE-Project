@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const subject = await Subject.findById(req.params.id);
-    if (!subject) return res.status(404).json({ message: 'Subject not found' });
+    if (!subject) return res.status(404).json({ message: 'ไม่พบรายวิชา' });
     res.json(subject);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -27,9 +27,10 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   const subject = new Subject({
     subjectCode: req.body.subjectCode,
-    subjectName: req.body.subjectName,
+    subjectNameEN: req.body.subjectNameEN,
+    subjectNameTH: req.body.subjectNameTH,
     credits: req.body.credits,
-    description: req.body.description
+    description: req.body.description,
   });
 
   try {
@@ -44,10 +45,11 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const subject = await Subject.findById(req.params.id);
-    if (!subject) return res.status(404).json({ message: 'Subject not found' });
+    if (!subject) return res.status(404).json({ message: 'ไม่พบรายวิชา' });
 
     if (req.body.subjectCode) subject.subjectCode = req.body.subjectCode;
-    if (req.body.subjectName) subject.subjectName = req.body.subjectName;
+    if (req.body.subjectNameEN) subject.subjectNameEN = req.body.subjectNameEN;
+    if (req.body.subjectNameTH) subject.subjectNameTH = req.body.subjectNameTH;
     if (req.body.credits) subject.credits = req.body.credits;
     if (req.body.description) subject.description = req.body.description;
 
@@ -62,10 +64,10 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const subject = await Subject.findById(req.params.id);
-    if (!subject) return res.status(404).json({ message: 'Subject not found' });
+    if (!subject) return res.status(404).json({ message: 'ไม่พบรายวิชา' });
 
-    await subject.remove();
-    res.json({ message: 'Subject deleted' });
+    await subject.deleteOne();
+    res.json({ message: 'ลบรายวิชาเรียบร้อยแล้ว' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
