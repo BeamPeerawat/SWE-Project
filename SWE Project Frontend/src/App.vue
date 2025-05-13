@@ -20,7 +20,6 @@
 import NavBar from './components/Navbar.vue';
 import SideBar from './components/Sidebar.vue';
 import AdvisorSidebar from './components/AdvisorSidebar.vue';
-// เพิ่มการนำเข้า Sidebar สำหรับบทบาทอื่นๆ (ยังไม่ได้สร้าง)
 import InstructorSidebar from './components/InstructorSidebar.vue';
 import HeadSidebar from './components/HeadSidebar.vue';
 import AdminSidebar from './components/AdminSidebar.vue';
@@ -38,7 +37,7 @@ export default {
   data() {
     return {
       sidebarOpen: false,
-      userRole: null, // เปลี่ยนจาก 'student' เป็น null เพื่อจัดการหน้า Landing
+      userRole: null,
     };
   },
   created() {

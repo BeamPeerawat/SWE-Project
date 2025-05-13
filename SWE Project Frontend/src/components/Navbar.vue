@@ -68,7 +68,7 @@ export default {
   name: 'NavBar',
   data() {
     return {
-      isDropdownOpen: false
+      isDropdownOpen: false,
     };
   },
   computed: {
@@ -83,10 +83,18 @@ export default {
     toggleDropdown() {
       this.isDropdownOpen = !this.isDropdownOpen;
     },
-    logout() {
-      localStorage.removeItem('user');
-      this.$router.push('/login');
-    }
+    async logout() {
+      try {
+        await this.$axios.get('/api/auth/logout', { withCredentials: true });
+        localStorage.removeItem('user');
+        alert('คุณได้ออกจากระบบเรียบร้อยแล้ว!');
+        this.$router.push('/login');
+      } catch (error) {
+        console.error('Logout error:', error);
+        localStorage.removeItem('user');
+        this.$router.push('/login');
+      }
+    },
   },
   mounted() {
     // ปิด dropdown เมื่อคลิกนอกเมนู
@@ -95,11 +103,12 @@ export default {
         this.isDropdownOpen = false;
       }
     });
-  }
+  },
 };
 </script>
 
 <style scoped>
+/* คงสไตล์เดิมไว้ */
 .navbar {
   display: flex;
   justify-content: space-between;
@@ -138,15 +147,6 @@ export default {
 .menu-btn:hover {
   background: rgba(255, 255, 255, 0.1);
 }
-
-/* .logo {
-  width: 45px;
-  height: 45px;
-  border-radius: 50%;
-  background: white;
-  padding: 5px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-} */
 
 .brand-text h1 {
   margin: 0;
@@ -343,11 +343,6 @@ export default {
 
   .brand-text h1 {
     font-size: 1rem;
-  }
-
-  .logo {
-    width: 35px;
-    height: 35px;
   }
 
   .navbar-menu a span {
