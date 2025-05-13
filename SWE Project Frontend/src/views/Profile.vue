@@ -33,11 +33,11 @@
           </div>
           <div class="info-item">
             <label>รหัสนักศึกษา:</label>
-            <p v-if="!isEditing">{{ user.studentId || 'ยังไม่ได้ระบุ' }}</p>
+            <p v-if="!isEditing">{{ user.student_no || 'ยังไม่ได้ระบุ' }}</p>
             <input
               v-else
               type="text"
-              v-model="editUser.studentId"
+              v-model="editUser.student_no"
               placeholder="รหัสนักศึกษา"
               required
             />
@@ -55,11 +55,11 @@
           </div>
           <div class="info-item">
             <label>สาขาวิชา:</label>
-            <p v-if="!isEditing">{{ user.fieldOfStudy || 'ยังไม่ได้ระบุ' }}</p>
+            <p v-if="!isEditing">{{ user.branch || 'ยังไม่ได้ระบุ' }}</p>
             <input
               v-else
               type="text"
-              v-model="editUser.fieldOfStudy"
+              v-model="editUser.branch"
               placeholder="สาขาวิชา"
               required
             />
@@ -255,17 +255,17 @@ export default {
       selectedRequest: null,
       user: {
         name: '',
-        studentId: '',
+        student_no: '',
         faculty: '',
-        fieldOfStudy: '',
+        branch: '',
         email: '',
         contactNumber: ''
       },
       editUser: {
         name: '',
-        studentId: '',
+        student_no: '',
         faculty: '',
-        fieldOfStudy: '',
+        branch: '',
         email: '',
         contactNumber: ''
       },
@@ -273,51 +273,65 @@ export default {
     };
   },
   async mounted() {
-    // Load user data from localStorage
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      this.user = JSON.parse(storedUser);
-    }
-    // Fetch request history from backend
+    // โหลดข้อมูลผู้ใช้จาก backend
+    await this.fetchUserData();
+    // ดึงประวัติคำร้องจาก backend
     await this.fetchRequestHistory();
   },
   methods: {
+    async fetchUserData() {
+      try {
+        const storedUser = JSON.parse(localStorage.getItem('user'));
+        if (!storedUser || !storedUser.email) {
+          throw new Error('ไม่พบข้อมูลผู้ใช้ใน localStorage');
+        }
+        const response = await axios.get(`http://localhost:3000/api/user/${storedUser.email}`);
+        this.user = {
+          name: response.data.name || '',
+          student_no: response.data.student_no || '',
+          faculty: response.data.faculty || '',
+          branch: response.data.branch || '',
+          email: response.data.email || '',
+          contactNumber: response.data.contactNumber || ''
+        };
+        // อัปเดต localStorage ด้วยข้อมูลที่ดึงมา
+        localStorage.setItem('user', JSON.stringify(this.user));
+      } catch (error) {
+        console.error('เกิดข้อผิดพลาดในการดึงข้อมูลผู้ใช้:', error);
+        this.errorMessage = 'เกิดข้อผิดพลาดในการโหลดข้อมูลผู้ใช้ กรุณาลองใหม่';
+      }
+    },
     async fetchRequestHistory() {
       this.isLoading = true;
       this.errorMessage = '';
       try {
-        // ดึงข้อมูลผู้ใช้จาก localStorage
         const userData = JSON.parse(localStorage.getItem('user'));
         if (!userData || !userData.email || !userData._id) {
           throw new Error('ไม่พบข้อมูลผู้ใช้หรือข้อมูลไม่ครบถ้วน');
         }
 
-        console.log('Fetching request history for:', userData.email, userData._id); // ดีบั๊ก
+        console.log('กำลังดึงประวัติคำร้องสำหรับ:', userData.email, userData._id);
 
-        // ดึงข้อมูลจากทั้งสอง endpoints พร้อมกัน
         const [openCourseResponse, addSeatResponse] = await Promise.all([
           axios.get(`http://localhost:3000/api/opencourserequests?email=${userData.email}`),
           axios.get(`http://localhost:3000/api/addseatrequests?email=${userData.email}`)
         ]);
 
-        // แปลงข้อมูลจาก opencourserequests
         const openCourseRequests = openCourseResponse.data.map(request => ({
           ...request,
           requestType: 'คำร้องขอเปิดรายวิชานอกแผน'
         }));
 
-        // แปลงข้อมูลจาก addseatrequests
         const addSeatRequests = addSeatResponse.data.map(request => ({
           ...request,
           requestType: 'คำร้องขอเพิ่มที่นั่ง'
         }));
 
-        // รวมข้อมูลและกรองโดย email เพื่อความมั่นใจ
         this.requestHistory = [...openCourseRequests, ...addSeatRequests]
           .filter(request => request.email === userData.email)
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-        console.log('Fetched request history:', this.requestHistory); // ดีบั๊ก
+        console.log('ดึงประวัติคำร้องสำเร็จ:', this.requestHistory);
       } catch (error) {
         console.error('เกิดข้อผิดพลาดในการดึงข้อมูล:', error);
         this.errorMessage = 'เกิดข้อผิดพลาดในการโหลดประวัติคำร้อง กรุณาลองใหม่';
@@ -326,7 +340,6 @@ export default {
       }
     },
     formatDate(dateString) {
-      // Format MongoDB createdAt date to DD-MM-YYYY
       const date = new Date(dateString);
       return date.toLocaleDateString('th-TH', {
         day: '2-digit',
@@ -335,56 +348,57 @@ export default {
       });
     },
     formatStatus(status) {
-      // Map database status to user-friendly text
       return status === 'draft' ? 'ร่าง' : 'รอพิจารณา';
     },
     editProfile() {
-      // Enter edit mode and populate editUser with current user data
       this.editUser = { ...this.user };
       this.isEditing = true;
     },
-    saveProfile() {
-      // Validate contact number
+    async saveProfile() {
       if (this.editUser.contactNumber.length !== 10) {
         alert('กรุณากรอกเบอร์โทรศัพท์ 10 หลัก');
         return;
       }
-      // Update user data
-      this.user = { ...this.editUser };
-      // Save to localStorage
-      localStorage.setItem('user', JSON.stringify(this.user));
-      // Exit edit mode
-      this.isEditing = false;
-      alert('บันทึกข้อมูลเรียบร้อยแล้ว!');
+      try {
+        const response = await axios.put(`http://localhost:3000/api/user/${this.user.email}`, {
+          name: this.editUser.name,
+          student_no: this.editUser.student_no,
+          faculty: this.editUser.faculty,
+          branch: this.editUser.branch,
+          contactNumber: this.editUser.contactNumber
+        });
+        this.user = { ...response.data };
+        localStorage.setItem('user', JSON.stringify(this.user));
+        this.isEditing = false;
+        alert('บันทึกข้อมูลเรียบร้อยแล้ว!');
+      } catch (error) {
+        console.error('เกิดข้อผิดพลาดในการบันทึกข้อมูล:', error);
+        alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่');
+      }
     },
     cancelEdit() {
-      // Exit edit mode without saving
       this.isEditing = false;
       this.editUser = {
         name: '',
-        studentId: '',
+        student_no: '',
         faculty: '',
-        fieldOfStudy: '',
+        branch: '',
         email: '',
         contactNumber: ''
       };
     },
     restrictToNumbers(event) {
-      // Restrict contact number to numeric characters
       this.editUser.contactNumber = event.target.value.replace(/[^0-9]/g, '');
     },
     viewRequest(request) {
-      // Show modal with request details
       this.selectedRequest = request;
       this.showModal = true;
     },
     closeModal() {
-      // Hide modal and clear selected request
       this.showModal = false;
       this.selectedRequest = null;
     },
     getStatusClass(status) {
-      // Return class based on request status
       if (status === 'draft') return 'status-draft';
       return 'status-pending';
     }
@@ -739,7 +753,7 @@ td {
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  animation: modalFade 0.5s ease-out;
+  animation: modalFade 0.nate-out;
 }
 
 .modal-content {

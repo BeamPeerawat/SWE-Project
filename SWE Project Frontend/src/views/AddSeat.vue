@@ -134,12 +134,12 @@
                 <tr>
                   <td>
                     <select v-model="form.courseCode" @change="updateCourseDetails" required>
-                      <option value="" disabled>เลือกวิชา</option>
-                      <option v-for="subject in subjects" :key="subject._id" :value="subject.subjectCode">
-                        {{ subject.subjectCode }}
-                      </option>
-                    </select>
-                  </td>
+                    <option value="" disabled>เลือกวิชา</option>
+                    <option v-for="subject in subjects" :key="subject._id" :value="subject.subjectCode">
+                      {{ subject.subjectCode }}
+                    </option>
+                  </select>
+                </td>
                   <td><input type="text" v-model="form.courseTitle" placeholder="ชื่อวิชา" readonly /></td>
                   <td><input type="text" v-model="form.section" placeholder="ตอนเรียน" required /></td>
                   <td><input type="text" v-model="form.credits" placeholder="หน่วยกิต" readonly /></td>
@@ -257,8 +257,8 @@ export default {
       draftCount: 0,
     };
   },
-  created() {
-    // ดึงข้อมูลผู้ใช้จาก localStorage
+  async created() {
+    // ดึงข้อมูลผู้ใช้จาก localStorage เพื่อตรวจสอบการล็ peseอกอิน
     const userData = localStorage.getItem('user');
     if (userData) {
       this.user = JSON.parse(userData);
@@ -268,11 +268,8 @@ export default {
         this.$router.push('/login');
         return;
       }
-      // กรอกข้อมูลฟอร์มอัตโนมัติ
-      this.form.studentName = this.user.name || '';
-      this.form.email = this.user.email || '';
-      this.form.studentId = this.user.studentId || '';
-      this.form.signature = this.user.name || '';
+      // ดึงข้อมูลผู้ใช้จาก API
+      await this.fetchUserData();
     } else {
       // ถ้าไม่ล็อกอิน redirect ไป login
       this.showPopupMessage('กรุณาล็อกอินก่อนยื่นคำร้อง');
@@ -284,6 +281,45 @@ export default {
     await this.fetchDrafts();
   },
   methods: {
+    async fetchUserData() {
+      try {
+        // เรียก API เพื่อดึงข้อมูลผู้ใช้ตาม email
+        const response = await axios.get(`/api/user/${this.user.email}`);
+        const userData = response.data;
+
+        // กรอกข้อมูลในฟอร์มอัตโนมัติ
+        this.form.studentName = userData.name || '';
+        this.form.email = userData.email || '';
+        this.form.studentId = userData.student_no || '';
+        this.form.faculty = userData.faculty || '';
+        this.form.fieldOfStudy = userData.branch || '';
+        this.form.contactNumber = userData.contactNumber || '';
+        this.form.signature = userData.name || '';
+
+        // อัปเดต user object ด้วยข้อมูลล่าสุด
+        this.user = {
+          ...this.user,
+          name: userData.name,
+          student_no: userData.student_no,
+          faculty: userData.faculty,
+          branch: userData.branch,
+          contactNumber: userData.contactNumber,
+          role: userData.role,
+        };
+        // อัปเดต localStorage (ถ้าต้องการ)
+        localStorage.setItem('user', JSON.stringify(this.user));
+      } catch (error) {
+        console.error('Error fetching user data:', error.response?.data || error.message);
+        let errorMessage = 'เกิดข้อผิดพลาดในการโหลดข้อมูลผู้ใช้';
+        if (error.response?.status === 404) {
+          errorMessage = 'ไม่พบข้อมูลผู้ใช้ กรุณาล็อกอินใหม่';
+          this.$router.push('/login');
+        } else if (error.response?.status === 500) {
+          errorMessage = 'เกิดข้อผิดพลาดในเซิร์ฟเวอร์ กรุณาติดต่อผู้ดูแล';
+        }
+        this.showPopupMessage(errorMessage);
+      }
+    },
     async fetchSubjects() {
       try {
         const response = await axios.get('/api/subjects');
@@ -342,7 +378,7 @@ export default {
     updateCourseDetails() {
       const selectedSubject = this.subjects.find(subject => subject.subjectCode === this.form.courseCode);
       if (selectedSubject) {
-        this.form.courseTitle = selectedSubject.subjectName;
+        this.form.courseTitle = selectedSubject.subjectNameTH;
         this.form.credits = selectedSubject.credits.toString();
       } else {
         this.form.courseTitle = '';
