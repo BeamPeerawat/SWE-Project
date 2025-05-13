@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
+const MongoStore = require('connect-mongo'); // เพิ่ม MongoStore
 const passport = require('./config/passport');
 const connectDB = require('./config/db');
 const apiRoutes = require('./routes/api');
@@ -21,6 +22,15 @@ app.use(
     secret: 'your-session-secret',
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGO_URI,
+      collectionName: 'sessions',
+    }),
+    cookie: {
+      maxAge: 1000 * 60 * 60, // 1 ชั่วโมง
+      secure: process.env.NODE_ENV === 'production', // ใช้ secure ใน production
+      httpOnly: true,
+    },
   })
 );
 app.use(passport.initialize());

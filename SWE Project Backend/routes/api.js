@@ -73,7 +73,7 @@ router.post('/users', async (req, res) => {
     faculty: req.body.faculty,
     branch: req.body.branch,
     contactNumber: req.body.contactNumber,
-    role: req.body.role || 'student', // ค่าเริ่มต้นเป็น student
+    role: req.body.role || 'student',
   });
 
   try {
@@ -87,13 +87,16 @@ router.post('/users', async (req, res) => {
 // Google OAuth routes
 router.get(
   '/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
+  passport.authenticate('google', { scope: ['profile', 'email'], prompt: 'select_account' }) // เพิ่ม prompt
 );
 
+// Google OAuth callback
 router.get(
   '/auth/google/callback',
   passport.authenticate('google', { failureRedirect: 'http://localhost:8080/login' }),
   (req, res) => {
+    // ป้องกันการแคช
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     const user = {
       _id: req.user._id,
       email: req.user.email,
@@ -155,6 +158,22 @@ router.patch('/user/:email/role', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+});
+
+// Logout route
+router.get('/auth/logout', (req, res) => {
+  req.logout((err) => {
+    if (err) {
+      return res.status(500).json({ message: 'Error logging out' });
+    }
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: 'Error destroying session' });
+      }
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.redirect('http://localhost:8080/login');
+    });
+  });
 });
 
 module.exports = router;
