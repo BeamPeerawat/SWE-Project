@@ -36,40 +36,20 @@ export default {
     };
   },
   mounted() {
-    // ตรวจสอบ query parameter หลังจาก Google callback
-    const urlParams = new URLSearchParams(window.location.search);
-    const user = urlParams.get('user');
-    console.log('Query user:', user); // Debug
-    if (user) {
-      try {
-        const userData = JSON.parse(decodeURIComponent(user));
-        console.log('Parsed userData:', userData); // Debug
-        // ตรวจสอบความถูกต้องของข้อมูล
-        if (userData.email && userData.email.endsWith('@rmuti.ac.th')) {
-          localStorage.removeItem('user'); // เคลียร์ข้อมูลเก่า
-          localStorage.setItem('user', JSON.stringify(userData));
-          // ลบ query parameter เพื่อป้องกันการใช้ซ้ำ
-          window.history.replaceState({}, document.title, '/login');
-          // Redirect ตาม role
-          if (userData.role === 'advisor') {
-            this.$router.push('/advisor/home');
-          } else if (userData.role === 'instructor') {
-            this.$router.push('/instructor/home');
-          } else if (userData.role === 'head') {
-            this.$router.push('/head/home');
-          } else if (userData.role === 'admin') {
-            this.$router.push('/admin/dashboard');
-          } else {
-            this.$router.push('/home');
-          }
-        } else {
-          this.errorMessage = 'อีเมลไม่ถูกต้อง กรุณาใช้อีเมล @rmuti.ac.th';
-        }
-      } catch (error) {
-        console.error('Error parsing user:', error); // Debug
-        this.errorMessage = 'เกิดข้อผิดพลาดในการล็อกอิน';
-      }
+  // ตรวจสอบ query parameter หลังจาก Google callback
+  const urlParams = new URLSearchParams(window.location.search);
+  const user = urlParams.get('user');
+  if (user) {
+    try {
+      const userData = JSON.parse(decodeURIComponent(user));
+      // ล้าง localStorage ก่อนบันทึกข้อมูลผู้ใช้ใหม่
+      localStorage.removeItem('user');
+      localStorage.setItem('user', JSON.stringify(userData));
+      this.$router.push('/home');
+    } catch (error) {
+      this.errorMessage = 'เกิดข้อผิดพลาดในการล็อกอิน';
     }
+  }
   },
   methods: {
     loginWithGoogle() {
@@ -81,7 +61,7 @@ export default {
 </script>
 
 <style scoped>
-/* คงสไตล์เดิมไว้ */
+/* Animations */
 @keyframes fadeIn {
   from {
     opacity: 0;

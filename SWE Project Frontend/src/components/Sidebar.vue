@@ -92,24 +92,16 @@ export default {
     toggleRequestMenu() {
       this.requestMenuOpen = !this.requestMenuOpen;
     },
-    async logout() {
-      try {
-        await this.$axios.get('/api/auth/logout', { withCredentials: true });
-        localStorage.removeItem('user');
-        alert('คุณได้ออกจากระบบเรียบร้อยแล้ว!');
-        this.$router.push('/login');
-      } catch (error) {
-        console.error('Logout error:', error);
-        localStorage.removeItem('user');
-        this.$router.push('/login');
-      }
+    logout() {
+      localStorage.removeItem('user');
+      alert('คุณได้ออกจากระบบเรียบร้อยแล้ว!');
+      this.$router.push('/login');
     },
   },
 };
 </script>
 
 <style scoped>
-/* คงสไตล์เดิมไว้ */
 .sidebar {
   width: 280px;
   height: 100vh;
@@ -263,7 +255,7 @@ export default {
 }
 
 .submenu a.active {
-  background: rgba(255, 255, 255, foam: 0.15);
+  background: rgba(255, 255, 255, 0.15);
   color: white;
 }
 
