@@ -15,13 +15,23 @@ const app = express();
 connectDB();
 
 // Middleware
-app.use(cors({ origin: 'http://localhost:8080', credentials: true }));
+app.use(cors({
+  origin: ['http://localhost:8080', 'http://frontend:8080', 'http://localhost:3000', 'http://backend:3000', 'http://203.158.201.73:8080', 'http://203.158.201.73', 'http://localhost:3001', 'http://203.158.201.73:8081'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use(
   session({
     secret: 'your-session-secret',
     resave: false,
     saveUninitialized: false,
+    cookie: {
+      secure: false, // set to true if using https
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
   })
 );
 app.use(passport.initialize());

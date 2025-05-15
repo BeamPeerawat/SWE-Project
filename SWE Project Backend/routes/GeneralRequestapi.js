@@ -78,6 +78,23 @@ router.get('/drafts', ensureAuthenticated, async (req, res) => {
   }
 });
 
+// ใน routes/GeneralRequestapi.js
+router.get('/by-email', ensureAuthenticated, async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email) {
+      return res.status(400).json({ message: 'ต้องระบุอีเมล' });
+    }
+    const requests = await GeneralRequest.find({
+      email,
+      status: 'submitted',
+    }).sort({ createdAt: -1 });
+    res.json(requests);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // GET: Fetch all submitted requests for the authenticated user
 router.get('/', ensureAuthenticated, async (req, res) => {
   try {
@@ -139,23 +156,20 @@ router.put('/:id', ensureAuthenticated, async (req, res) => {
 });
 
 // DELETE: Delete a draft
-router.delete('/:id', ensureAuthenticated, async (req, res) => {
+router.delete('/:id/cancel', ensureAuthenticated, async (req, res) => {
   try {
     const request = await GeneralRequest.findById(req.params.id);
     if (!request) {
-      return res.status(404).json({ message: 'ไม่พบแบบร่าง' });
-    }
-
-    // Ensure the request is a draft and belongs to the authenticated user
-    if (request.status !== 'draft') {
-      return res.status(400).json({ message: 'สามารถลบได้เฉพาะแบบร่างเท่านั้น' });
+      return res.status(404).json({ message: 'ไม่พบคำร้อง' });
     }
     if (request.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'ไม่มีสิทธิ์ลบแบบร่างนี้' });
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์ยกเลิกคำร้องนี้' });
     }
-
+    if (request.status !== 'submitted') {
+      return res.status(400).json({ message: 'สามารถยกเลิกได้เฉพาะคำร้องที่ยื่นแล้วเท่านั้น' });
+    }
     await GeneralRequest.findByIdAndDelete(req.params.id);
-    res.json({ message: 'ลบแบบร่างสำเร็จ' });
+    res.json({ message: 'ยกเลิกคำร้องสำเร็จ' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
