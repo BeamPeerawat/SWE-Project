@@ -216,35 +216,47 @@ export default {
   },
   created() {
     // Load user data from localStorage
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      this.user = JSON.parse(userData);
-      if (!this.user.email.endsWith('@rmuti.ac.th')) {
-        this.showPopupMessage('กรุณาใช้อีเมลที่ลงท้ายด้วย @rmuti.ac.th');
+    this.loadUserData();
+    
+    // Fetch drafts on component creation
+    this.fetchDrafts();
+  },
+  methods: {
+    loadUserData() {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        this.user = JSON.parse(userData);
+        if (!this.user.email.endsWith('@rmuti.ac.th')) {
+          this.showPopupMessage('กรุณาใช้อีเมลที่ลงท้ายด้วย @rmuti.ac.th');
+          setTimeout(() => {
+            this.$router.push('/login');
+          }, 2000);
+          return;
+        }
+        
+        // Pre-fill form with user data from profile
+        this.form.email = this.user.email || '';
+        this.form.fullName = this.user.name || '';
+        this.form.studentId = this.user.student_no || '';
+        
+        // Specifically ensure these fields are properly populated
+        this.form.faculty = this.user.faculty || '';
+        this.form.fieldOfStudy = this.user.branch || '';
+        this.form.contactNumber = this.user.contactNumber || '';
+        
+        this.form.signature = this.user.name || '';
+      } else {
+        this.showPopupMessage('กรุณาล็อกอินก่อนยื่นคำร้อง');
         setTimeout(() => {
           this.$router.push('/login');
         }, 2000);
         return;
       }
-      // Pre-fill form with user data
-      this.form.email = this.user.email || '';
-      this.form.fullName = this.user.name || '';
-      this.form.studentId = this.user.student_no || '';
-      this.form.faculty = this.user.faculty || '';
-      this.form.fieldOfStudy = this.user.branch || '';
-      this.form.contactNumber = this.user.contactNumber || '';
-      this.form.signature = this.user.name || '';
-    } else {
-      this.showPopupMessage('กรุณาล็อกอินก่อนยื่นคำร้อง');
-      setTimeout(() => {
-        this.$router.push('/login');
-      }, 2000);
-      return;
-    }
-    // Fetch drafts on component creation
-    this.fetchDrafts();
-  },
-  methods: {
+    },
+    refreshUserData() {
+      // This method can be called to refresh user data if needed
+      this.loadUserData();
+    },
     async fetchDrafts() {
       try {
         const response = await this.$axios.get('/api/generalrequests/drafts');

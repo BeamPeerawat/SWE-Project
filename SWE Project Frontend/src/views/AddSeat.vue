@@ -274,6 +274,12 @@ export default {
       this.form.studentName = this.user.name || '';
       this.form.email = this.user.email || '';
       this.form.studentId = this.user.student_no || '';
+      
+      // เพิ่มการดึงข้อมูลคณะ สาขาวิชา และเบอร์โทรศัพท์จากโปรไฟล์
+      this.form.faculty = this.user.faculty || '';
+      this.form.fieldOfStudy = this.user.branch || '';
+      this.form.contactNumber = this.user.contactNumber || '';
+      
       this.form.signature = this.user.name || '';
       this.form.classLevel = this.user.group || '';
     } else {
