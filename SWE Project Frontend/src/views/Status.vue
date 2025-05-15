@@ -218,8 +218,6 @@
 </template>
 
 <script>
-import axios from 'axios';
-
 export default {
   name: 'StatusPage',
   data() {
@@ -265,10 +263,11 @@ export default {
 
         console.log('Fetching requests for:', userData.email, userData._id); // ดีบั๊ก
 
-        // ดึงข้อมูลจากทั้งสอง endpoints พร้อมกัน
-        const [openCourseResponse, addSeatResponse] = await Promise.all([
-          axios.get(`http://localhost:3000/api/opencourserequests?email=${userData.email}`),
-          axios.get(`http://localhost:3000/api/addseatrequests?email=${userData.email}`)
+        // ดึงข้อมูลจากทั้งสาม endpoints พร้อมกัน
+        const [openCourseResponse, addSeatResponse, generalRequestResponse] = await Promise.all([
+          this.$axios.get(`/api/opencourserequests?email=${userData.email}`),
+          this.$axios.get(`/api/addseatrequests?email=${userData.email}`),
+          this.$axios.get(`/api/generalrequests/by-email?email=${userData.email}`) // ใช้ endpoint by-email และส่ง email parameter
         ]);
 
         // แปลงข้อมูลจาก opencourserequests
@@ -315,8 +314,30 @@ export default {
           email: form.email
         }));
 
+        // แปลงข้อมูลจาก generalrequests
+        const generalRequests = generalRequestResponse.data.map(form => ({
+          _id: form._id,
+          date: this.formatDate(form.createdAt),
+          type: 'คำร้องทั่วไป',
+          course: this.getPetitionTypeLabel(form.petitionType), // ใช้ประเภทคำร้องเป็นชื่อวิชา
+          status: this.formatStatus(form.status),
+          note: form.details || '-',
+          createdAt: form.createdAt,
+          courseCode: '', // คำร้องทั่วไปไม่มีรหัสวิชา
+          courseTitle: this.getPetitionTypeLabel(form.petitionType),
+          reason: form.details,
+          studentName: form.fullName,
+          studentId: form.studentId,
+          faculty: form.faculty,
+          fieldOfStudy: form.fieldOfStudy,
+          contactNumber: form.contactNumber,
+          email: form.email,
+          levelOfStudy: ['ไม่ระบุ'], // ค่าเริ่มต้นสำหรับคำร้องทั่วไป
+          petitionType: form.petitionType
+        }));
+
         // รวมข้อมูลและกรองโดย userId เพื่อความมั่นใจ
-        this.requests = [...openCourseRequests, ...addSeatRequests].filter(
+        this.requests = [...openCourseRequests, ...addSeatRequests, ...generalRequests].filter(
           request => request.email === userData.email
         );
 
@@ -403,13 +424,17 @@ export default {
         }
 
         // กำหนด endpoint ตามประเภทคำร้อง
-        const endpoint =
-          this.selectedRequest.type === 'คำร้องขอเปิดรายวิชานอกแผน'
-            ? `http://localhost:3000/api/opencourserequests/${this.selectedRequest._id}`
-            : `http://localhost:3000/api/addseatrequests/${this.selectedRequest._id}`;
+        let endpoint;
+        if (this.selectedRequest.type === 'คำร้องขอเปิดรายวิชานอกแผน') {
+          endpoint = `/api/opencourserequests/${this.selectedRequest._id}`;
+        } else if (this.selectedRequest.type === 'คำร้องขอเพิ่มที่นั่ง') {
+          endpoint = `/api/addseatrequests/${this.selectedRequest._id}`;
+        } else if (this.selectedRequest.type === 'คำร้องทั่วไป') {
+          endpoint = `/api/generalrequests/${this.selectedRequest._id}/cancel`;
+        }
 
         // ส่งคำขอ DELETE ไปยัง backend
-        await axios.delete(endpoint);
+        await this.$axios.delete(endpoint);
 
         // แสดง notification
         this.showNotification = true;
@@ -457,6 +482,15 @@ export default {
     },
     closeNotification() {
       this.showNotification = false;
+    },
+    getPetitionTypeLabel(petitionType) {
+      const petitionTypeLabels = {
+        request_leave: 'ขอลา',
+        request_transcript: 'ขอใบระเบียนผลการศึกษา',
+        request_change_course: 'ขอเปลี่ยนแปลงรายวิชา',
+        other: 'อื่นๆ'
+      };
+      return petitionTypeLabels[petitionType] || petitionType;
     }
   },
   async created() {

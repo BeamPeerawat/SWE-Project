@@ -128,13 +128,13 @@
         <div v-else-if="errorMessage" class="error-message">
           {{ errorMessage }}
         </div>
-        <div v-else class="history-table">
+        <div class="history-table">
           <table>
             <thead>
               <tr>
                 <th>วันที่ยื่น</th>
                 <th>ประเภทคำร้อง</th>
-                <th>รายวิชา</th>
+                <th>รายละเอียด</th>
                 <th>สถานะ</th>
                 <th>การดำเนินการ</th>
               </tr>
@@ -143,7 +143,14 @@
               <tr v-for="request in requestHistory" :key="request._id">
                 <td>{{ formatDate(request.createdAt) }}</td>
                 <td>{{ request.requestType }}</td>
-                <td>{{ `${request.courseCode} - ${request.courseTitle}` }}</td>
+                <td>
+                  <span v-if="request.requestType === 'คำร้องทั่วไป'">
+                    {{ request.courseTitle }}
+                  </span>
+                  <span v-else>
+                    {{ `${request.courseCode} - ${request.courseTitle}` }}
+                  </span>
+                </td>
                 <td>
                   <span :class="getStatusClass(request.status)">{{
                     formatStatus(request.status)
@@ -163,7 +170,7 @@
         </div>
       </div>
 
-      <!-- Request Details Modal -->
+      <!-- โมดัลรายละเอียดคำร้อง -->
       <div v-if="showModal" class="modal-overlay" @click="closeModal">
         <div class="modal-content" @click.stop>
           <div class="modal-header">
@@ -173,7 +180,7 @@
             </button>
           </div>
           <div class="modal-body">
-            <!-- Request Information -->
+            <!-- ข้อมูลคำร้อง -->
             <div class="detail-section">
               <h4><i class="fas fa-info-circle"></i> ข้อมูลคำร้อง</h4>
               <div class="detail-item">
@@ -182,18 +189,22 @@
               </div>
               <div class="detail-item">
                 <label><i class="fas fa-file-signature"></i> ประเภทคำร้อง:</label>
-                <p>คำร้องขอเปิดรายวิชานอกแผน</p>
+                <p>{{ selectedRequest.requestType }}</p>
               </div>
-              <div class="detail-item">
+              <div class="detail-item" v-if="selectedRequest.requestType !== 'คำร้องทั่วไป'">
                 <label><i class="fas fa-book"></i> รายวิชา:</label>
                 <p class="highlight">{{ `${selectedRequest.courseCode} - ${selectedRequest.courseTitle}` }}</p>
               </div>
-              <div class="detail-item">
+              <div class="detail-item" v-else>
+                <label><i class="fas fa-file"></i> ประเภทคำร้องทั่วไป:</label>
+                <p class="highlight">{{ selectedRequest.courseTitle }}</p>
+              </div>
+              <div class="detail-item" v-if="selectedRequest.requestType !== 'คำร้องทั่วไป'">
                 <label><i class="fas fa-graduation-cap"></i> หน่วยกิต:</label>
                 <p>{{ selectedRequest.credits }}</p>
               </div>
               <div class="detail-item">
-                <label><i class="fas fa-comment"></i> เหตุผล:</label>
+                <label><i class="fas fa-comment"></i> รายละเอียด/เหตุผล:</label>
                 <p>{{ selectedRequest.reason }}</p>
               </div>
               <div class="detail-item">
@@ -204,7 +215,7 @@
               </div>
             </div>
 
-            <!-- Student Information -->
+            <!-- ข้อมูลนักศึกษา -->
             <div class="detail-section">
               <h4><i class="fas fa-user"></i> ข้อมูลนักศึกษา</h4>
               <div class="detail-item">
@@ -225,7 +236,7 @@
               </div>
             </div>
 
-            <!-- Contact Information -->
+            <!-- ข้อมูลติดต่อ -->
             <div class="detail-section">
               <h4><i class="fas fa-envelope"></i> ข้อมูลติดต่อ</h4>
               <div class="detail-item">
@@ -345,39 +356,57 @@ export default {
       }
     },
     async fetchRequestHistory() {
-      this.isLoading = true;
-      this.errorMessage = '';
-      try {
-        const userData = JSON.parse(localStorage.getItem('user'));
-        if (!userData || !userData.email || !userData._id) {
-          throw new Error('ไม่พบข้อมูลผู้ใช้หรือข้อมูลไม่ครบถ้วน');
-        }
+  this.isLoading = true;
+  this.errorMessage = '';
+  try {
+    const userData = JSON.parse(localStorage.getItem('user'));
+    if (!userData || !userData.email || !userData._id) {
+      throw new Error('ไม่พบข้อมูลผู้ใช้หรือข้อมูลไม่ครบถ้วน');
+    }
 
-        const [openCourseResponse, addSeatResponse] = await Promise.all([
-          this.$axios.get(`/api/opencourserequests?email=${userData.email}`),
-          this.$axios.get(`/api/addseatrequests?email=${userData.email}`),
-        ]);
+    const [openCourseResponse, addSeatResponse, generalRequestResponse] = await Promise.all([
+      this.$axios.get(`/api/opencourserequests?email=${userData.email}`),
+      this.$axios.get(`/api/addseatrequests?email=${userData.email}`),
+      this.$axios.get(`/api/generalrequests`), // ดึงคำร้องทั่วไป
+    ]);
 
-        const openCourseRequests = openCourseResponse.data.map(request => ({
-          ...request,
-          requestType: 'คำร้องขอเปิดรายวิชานอกแผน',
-        }));
+    const openCourseRequests = openCourseResponse.data.map(request => ({
+      ...request,
+      requestType: 'คำร้องขอเปิดรายวิชานอกแผน',
+    }));
 
-        const addSeatRequests = addSeatResponse.data.map(request => ({
-          ...request,
-          requestType: 'คำร้องขอเพิ่มที่นั่ง',
-        }));
+    const addSeatRequests = addSeatResponse.data.map(request => ({
+      ...request,
+      requestType: 'คำร้องขอเพิ่มที่นั่ง',
+    }));
 
-        this.requestHistory = [...openCourseRequests, ...addSeatRequests]
-          .filter(request => request.email === userData.email)
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      } catch (error) {
-        console.error('เกิดข้อผิดพลาดในการดึงข้อมูล:', error);
-        this.errorMessage = 'เกิดข้อผิดพลาดในการโหลดประวัติคำร้อง กรุณาลองใหม่';
-      } finally {
-        this.isLoading = false;
-      }
-    },
+    const generalRequests = generalRequestResponse.data.map(request => ({
+      ...request,
+      requestType: 'คำร้องทั่วไป',
+      courseCode: '', // คำร้องทั่วไปไม่มีรหัสวิชา
+      courseTitle: this.getPetitionTypeLabel(request.petitionType), // ใช้ประเภทคำร้องเป็นชื่อวิชา
+    }));
+
+    this.requestHistory = [...openCourseRequests, ...addSeatRequests, ...generalRequests]
+      .filter(request => request.email === userData.email)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  } catch (error) {
+    console.error('เกิดข้อผิดพลาดในการดึงข้อมูล:', error);
+    this.errorMessage = 'เกิดข้อผิดพลาดในการโหลดประวัติคำร้อง กรุณาลองใหม่';
+  } finally {
+    this.isLoading = false;
+  }
+},
+
+getPetitionTypeLabel(petitionType) {
+  const petitionTypeLabels = {
+    request_leave: 'ขอลา',
+    request_transcript: 'ขอใบระเบียนผลการศึกษา',
+    request_change_course: 'ขอเปลี่ยนแปลงรายวิชา',
+    other: 'อื่นๆ',
+  };
+  return petitionTypeLabels[petitionType] || petitionType;
+},
     formatDate(dateString) {
       const date = new Date(dateString);
       return date.toLocaleDateString('th-TH', {
@@ -461,9 +490,21 @@ export default {
       this.editUser.contactNumber = event.target.value.replace(/[^0-9]/g, '');
     },
     viewRequest(request) {
-      this.selectedRequest = request;
-      this.showModal = true;
-    },
+  this.selectedRequest = {
+    ...request,
+    // ตรวจสอบให้แน่ใจว่าฟิลด์ครบสำหรับคำร้องทั่วไป
+    studentName: request.fullName || request.studentName,
+    studentId: request.studentId || request.student_no,
+    faculty: request.faculty,
+    fieldOfStudy: request.fieldOfStudy || request.branch,
+    contactNumber: request.contactNumber,
+    email: request.email,
+    levelOfStudy: request.levelOfStudy || ['ไม่ระบุ'], // ค่าเริ่มต้นสำหรับคำร้องทั่วไป
+    reason: request.details || request.reason || 'ไม่ระบุ',
+    credits: request.credits || 'N/A', // คำร้องทั่วไปไม่มีหน่วยกิต
+  };
+  this.showModal = true;
+},
     closeModal() {
       this.showModal = false;
       this.selectedRequest = null;
@@ -479,39 +520,43 @@ export default {
       this.showConfirmModal = false;
     },
     async confirmCancel() {
-      try {
-        if (!this.selectedRequest || !this.selectedRequest._id) {
-          throw new Error('ไม่พบข้อมูลคำร้องที่เลือก');
-        }
-        const endpoint =
-          this.selectedRequest.requestType === 'คำร้องขอเปิดรายวิชานอกแผน'
-            ? `/api/opencourserequests/${this.selectedRequest._id}`
-            : `/api/addseatrequests/${this.selectedRequest._id}`;
-        await this.$axios.delete(endpoint);
-        this.showNotification = true;
-        this.notificationMessage = 'ยกเลิกคำร้องสำเร็จ';
-        this.notificationType = 'success';
-        this.notificationIcon = 'fas fa-check-circle';
-        this.requestHistory = this.requestHistory.filter(
-          request => request._id !== this.selectedRequest._id
-        );
-        this.closeConfirmModal();
-        this.closeModal();
-        setTimeout(() => {
-          this.closeNotification();
-        }, 5000);
-      } catch (error) {
-        console.error('เกิดข้อผิดพลาดในการยกเลิกคำร้อง:', error);
-        this.showNotification = true;
-        this.notificationMessage = 'ไม่สามารถยกเลิกคำร้องได้ กรุณาลองใหม่';
-        this.notificationType = 'error';
-        this.notificationIcon = 'fas fa-exclamation-circle';
-        this.closeConfirmModal();
-        setTimeout(() => {
-          this.closeNotification();
-        }, 5000);
-      }
-    },
+  try {
+    if (!this.selectedRequest || !this.selectedRequest._id) {
+      throw new Error('ไม่พบข้อมูลคำร้องที่เลือก');
+    }
+    let endpoint;
+    if (this.selectedRequest.requestType === 'คำร้องขอเปิดรายวิชานอกแผน') {
+      endpoint = `/api/opencourserequests/${this.selectedRequest._id}`;
+    } else if (this.selectedRequest.requestType === 'คำร้องขอเพิ่มที่นั่ง') {
+      endpoint = `/api/addseatrequests/${this.selectedRequest._id}`;
+    } else if (this.selectedRequest.requestType === 'คำร้องทั่วไป') {
+      endpoint = `/api/generalrequests/${this.selectedRequest._id}/cancel`;
+    }
+    await this.$axios.delete(endpoint);
+    this.showNotification = true;
+    this.notificationMessage = 'ยกเลิกคำร้องสำเร็จ';
+    this.notificationType = 'success';
+    this.notificationIcon = 'fas fa-check-circle';
+    this.requestHistory = this.requestHistory.filter(
+      request => request._id !== this.selectedRequest._id
+    );
+    this.closeConfirmModal();
+    this.closeModal();
+    setTimeout(() => {
+      this.closeNotification();
+    }, 5000);
+  } catch (error) {
+    console.error('เกิดข้อผิดพลาดในการยกเลิกคำร้อง:', error);
+    this.showNotification = true;
+    this.notificationMessage = 'ไม่สามารถยกเลิกคำร้องได้ กรุณาลองใหม่';
+    this.notificationType = 'error';
+    this.notificationIcon = 'fas fa-exclamation-circle';
+    this.closeConfirmModal();
+    setTimeout(() => {
+      this.closeNotification();
+    }, 5000);
+  }
+},
     closeNotification() {
       this.showNotification = false;
     },
