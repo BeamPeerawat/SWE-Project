@@ -1,0 +1,50 @@
+version: '3'
+services:
+  frontend:
+    build: "./SWE Project Frontend"
+    ports:
+      - "8081:8080"
+    volumes:
+      - "./SWE Project Frontend:/app"
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    restart: always
+    networks:
+      - app-network
+
+  backend:
+    build: "./SWE Project Backend"
+    ports:
+      - "3001:3000"
+    volumes:
+      - "./SWE Project Backend:/app"
+      - /app/node_modules
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/SWEProject
+      - PORT=3000
+      - GOOGLE_CLIENT_ID=721285622151-70osfpavqjmolb5su2dm927gf7phj3o0.apps.googleusercontent.com
+      - GOOGLE_CLIENT_SECRET=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
+      - GOOGLE_REDIRECT_URI=http://203.158.201.73:3001/api/auth/google/callback
+    depends_on:
+      - mongo
+    restart: always
+    networks:
+      - app-network
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: always
+    networks:
+      - app-network
+
+volumes:
+  mongo-data:
+
+networks:
+  app-network:
+    driver: bridge

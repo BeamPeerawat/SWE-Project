@@ -1,3 +1,4 @@
+// SWE Project Backend\models\GeneralRequest.js
 const mongoose = require('mongoose');
 
 const generalRequestSchema = new mongoose.Schema({
@@ -66,9 +67,25 @@ const generalRequestSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['draft', 'submitted'],
-    default: 'draft<context>draft',
+    enum: [
+      'draft',
+      'pending_advisor',
+      'advisor_approved',
+      'advisor_rejected',
+      'pending_head',
+      'head_approved',
+      'head_rejected',
+    ],
+    default: 'draft',
     required: true,
+  },
+  advisorComment: {
+    type: String,
+    trim: true,
+  },
+  headComment: {
+    type: String,
+    trim: true,
   },
   createdAt: {
     type: Date,

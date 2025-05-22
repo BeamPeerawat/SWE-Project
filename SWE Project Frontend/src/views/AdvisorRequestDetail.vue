@@ -16,60 +16,70 @@
       </div>
   
       <!-- Request Details -->
-      <div class="request-container">
-        <div class="detail-section">
-          <h2>ข้อมูลคำร้อง</h2>
-          <div class="detail-item">
-            <label><i class="fas fa-calendar"></i> วันที่ยื่น:</label>
-            <p>{{ formatDate(request.createdAt) }}</p>
-          </div>
-          <div class="detail-item">
-            <label><i class="fas fa-file-signature"></i> ประเภทคำร้อง:</label>
-            <p>{{ request.requestType }}</p>
-          </div>
-          <div class="detail-item">
-            <label><i class="fas fa-info"></i> รายละเอียด:</label>
-            <p>{{ request.details }}</p>
-          </div>
-          <div class="detail-item">
-            <label><i class="fas fa-info"></i> สถานะ:</label>
-            <p :class="getStatusClass(request.status)">{{ formatStatus(request.status) }}</p>
-          </div>
+      <div class="request-container" v-if="request">
+      <div class="detail-section">
+        <h2>ข้อมูลคำร้อง</h2>
+        <div class="detail-item">
+          <label><i class="fas fa-calendar"></i> วันที่ยื่น:</label>
+          <p>{{ formatDate(request.createdAt) }}</p>
         </div>
-  
-        <div class="detail-section">
-          <h2>ข้อมูลนักศึกษา</h2>
-          <div class="detail-item">
-            <label><i class="fas fa-user"></i> ชื่อ-นามสกุล:</label>
-            <p>{{ request.fullName }}</p>
-          </div>
-          <div class="detail-item">
-            <label><i class="fas fa-id-card"></i> รหัสนักศึกษา:</label>
-            <p>{{ request.studentId }}</p>
-          </div>
-          <div class="detail-item">
-            <label><i class="fas fa-university"></i> คณะ:</label>
-            <p>{{ request.faculty }}</p>
-          </div>
-          <div class="detail-item">
-            <label><i class="fas fa-graduation-cap"></i> สาขาวิชา:</label>
-            <p>{{ request.fieldOfStudy }}</p>
-          </div>
+        <div class="detail-item">
+          <label><i class="fas fa-file-signature"></i> ประเภทคำร้อง:</label>
+          <p>{{ petitionTypeLabels[request.petitionType] || request.petitionType }}</p>
         </div>
-  
-        <div class="detail-section">
-          <h2>ข้อมูลติดต่อ</h2>
-          <div class="detail-item">
-            <label><i class="fas fa-phone"></i> เบอร์โทรศัพท์:</label>
-            <p>{{ request.contactNumber }}</p>
-          </div>
-          <div class="detail-item">
-            <label><i class="fas fa-envelope"></i> อีเมล:</label>
-            <p>{{ request.email }}</p>
-          </div>
+        <div class="detail-item">
+          <label><i class="fas fa-info"></i> รายละเอียด:</label>
+          <p>{{ request.details }}</p>
         </div>
-  
-        <!-- Action Buttons -->
+        <div class="detail-item">
+          <label><i class="fas fa-info"></i> สถานะ:</label>
+          <p :class="getStatusClass(request.status)">{{ formatStatus(request.status) }}</p>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <h2>ข้อมูลนักศึกษา</h2>
+        <div class="detail-item">
+          <label><i class="fas fa-user"></i> ชื่อ-นามสกุล:</label>
+          <p>{{ request.fullName }}</p>
+        </div>
+        <div class="detail-item">
+          <label><i class="fas fa-id-card"></i> รหัสนักศึกษา:</label>
+          <p>{{ request.studentId }}</p>
+        </div>
+        <div class="detail-item">
+          <label><i class="fas fa-university"></i> คณะ:</label>
+          <p>{{ request.faculty }}</p>
+        </div>
+        <div class="detail-item">
+          <label><i class="fas fa-graduation-cap"></i> สาขาวิชา:</label>
+          <p>{{ request.fieldOfStudy }}</p>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <h2>ข้อมูลติดต่อ</h2>
+        <div class="detail-item">
+          <label><i class="fas fa-phone"></i> เบอร์โทรศัพท์:</label>
+          <p>{{ request.contactNumber }}</p>
+        </div>
+        <div class="detail-item">
+          <label><i class="fas fa-envelope"></i> อีเมล:</label>
+          <p>{{ request.email }}</p>
+        </div>
+      </div>
+
+      <!-- Comment and Action Buttons -->
+      <div class="detail-section" v-if="request.status === 'pending_advisor'">
+        <h2>การพิจารณาคำร้อง</h2>
+        <div class="form-group">
+          <label>ความเห็น:</label>
+          <textarea
+            v-model="comment"
+            rows="4"
+            placeholder="กรุณาระบุความเห็น (ถ้ามี)"
+          ></textarea>
+        </div>
         <div class="action-buttons">
           <button class="approve-btn" @click="approveRequest">
             <i class="fas fa-check"></i> อนุมัติ
@@ -79,6 +89,7 @@
           </button>
         </div>
       </div>
+    </div>
   
       <!-- Notification -->
       <div v-if="showNotification" class="notification" :class="notificationType">
@@ -102,34 +113,84 @@
     data() {
       return {
         user: null,
-        request: {
-          _id: '1',
-          createdAt: '2025-05-01',
-          studentId: '1234567890',
-          fullName: 'นายสมชาย ใจดี',
-          requestType: 'คำร้องทั่วไป',
-          details: 'ขอลาเรียน 1 สัปดาห์',
-          status: 'pending',
-          faculty: 'วิศวกรรมศาสตร์',
-          fieldOfStudy: 'วิศวกรรมคอมพิวเตอร์',
-          contactNumber: '0123456789',
-          email: 'somchai@rmuti.ac.th',
-        },
+        request: null,
+        comment: '',
         showNotification: false,
         notificationMessage: '',
         notificationType: 'success',
         notificationIcon: 'fas fa-check-circle',
+        petitionTypeLabels: {
+          request_leave: 'ขอลา',
+          request_transcript: 'ขอใบระเบียนผลการศึกษา',
+          request_change_course: 'ขอเปลี่ยนแปลงรายวิชา',
+          other: 'อื่นๆ',
+        },
       };
     },
     created() {
       const userData = localStorage.getItem('user');
       if (userData) {
         this.user = JSON.parse(userData);
+        this.fetchRequest();
+      } else {
+        this.$router.push('/login');
       }
-      // จำลองการดึงข้อมูลคำร้องตาม ID
-      // ในอนาคตจะใช้ this.$route.params.id เพื่อดึงข้อมูลจริง
     },
     methods: {
+      async fetchRequest() {
+        try {
+          const response = await this.$axios.get(`/api/generalrequests/${this.$route.params.id}`);
+          this.request = response.data;
+        } catch (error) {
+          this.showNotification = true;
+          this.notificationMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการดึงข้อมูลคำร้อง';
+          this.notificationType = 'error';
+          this.notificationIcon = 'fas fa-exclamation-circle';
+          setTimeout(() => {
+            this.$router.push('/advisor/home');
+          }, 3000);
+        }
+      },
+      async approveRequest() {
+        try {
+          await this.$axios.post(`/api/generalrequests/${this.$route.params.id}/approve`, {
+            comment: this.comment,
+          });
+          this.showNotification = true;
+          this.notificationMessage = 'อนุมัติคำร้องเรียบร้อยแล้ว';
+          this.notificationType = 'success';
+          this.notificationIcon = 'fas fa-check-circle';
+          setTimeout(() => {
+            this.showNotification = false;
+            this.$router.push('/advisor/home');
+          }, 3000);
+        } catch (error) {
+          this.showNotification = true;
+          this.notificationMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการอนุมัติคำร้อง';
+          this.notificationType = 'error';
+          this.notificationIcon = 'fas fa-exclamation-circle';
+        }
+      },
+      async rejectRequest() {
+        try {
+          await this.$axios.post(`/api/generalrequests/${this.$route.params.id}/reject`, {
+            comment: this.comment,
+          });
+          this.showNotification = true;
+          this.notificationMessage = 'ปฏิเสธคำร้องเรียบร้อยแล้ว';
+          this.notificationType = 'error';
+          this.notificationIcon = 'fas fa-exclamation-circle';
+          setTimeout(() => {
+            this.showNotification = false;
+            this.$router.push('/advisor/home');
+          }, 3000);
+        } catch (error) {
+          this.showNotification = true;
+          this.notificationMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการปฏิเสธคำร้อง';
+          this.notificationType = 'error';
+          this.notificationIcon = 'fas fa-exclamation-circle';
+        }
+      },
       formatDate(dateString) {
         const date = new Date(dateString);
         return date.toLocaleDateString('th-TH', {
@@ -139,30 +200,26 @@
         });
       },
       formatStatus(status) {
-        return status === 'pending' ? 'รอพิจารณา' : status;
+        const statusLabels = {
+          pending_advisor: 'รอพิจารณา',
+          advisor_approved: 'อนุมัติโดยอาจารย์ที่ปรึกษา',
+          advisor_rejected: 'ปฏิเสธโดยอาจารย์ที่ปรึกษา',
+          pending_head: 'รอพิจารณาโดยหัวหน้าสาขา',
+          head_approved: 'อนุมัติโดยหัวหน้าสาขา',
+          head_rejected: 'ปฏิเสธโดยหัวหน้าสาขา',
+        };
+        return statusLabels[status] || status;
       },
       getStatusClass(status) {
-        return status === 'pending' ? 'status-pending' : '';
-      },
-      approveRequest() {
-        this.showNotification = true;
-        this.notificationMessage = 'อนุมัติคำร้องเรียบร้อยแล้ว';
-        this.notificationType = 'success';
-        this.notificationIcon = 'fas fa-check-circle';
-        setTimeout(() => {
-          this.showNotification = false;
-          this.$router.push('/advisor/home');
-        }, 3000);
-      },
-      rejectRequest() {
-        this.showNotification = true;
-        this.notificationMessage = 'ปฏิเสธ คำร้องเรียบร้อยแล้ว';
-        this.notificationType = 'error';
-        this.notificationIcon = 'fas fa-exclamation-circle';
-        setTimeout(() => {
-          this.showNotification = false;
-          this.$router.push('/advisor/home');
-        }, 3000);
+        const statusClasses = {
+          pending_advisor: 'status-pending',
+          advisor_approved: 'status-approved',
+          advisor_rejected: 'status-rejected',
+          pending_head: 'status-pending',
+          head_approved: 'status-approved',
+          head_rejected: 'status-rejected',
+        };
+        return statusClasses[status] || '';
       },
     },
   };
@@ -389,4 +446,42 @@
   .footer-section p {
     margin: 0;
   }
+
+  .form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+  font-size: 1.1rem;
+}
+
+.form-group textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-family: 'Kanit', sans-serif;
+  font-size: 1rem;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.form-group textarea:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 5px rgba(26, 115, 232, 0.3);
+  outline: none;
+}
+
+.status-approved {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.status-rejected {
+  color: #ef4444;
+  font-weight: 500;
+}
   </style>

@@ -215,10 +215,7 @@ export default {
     };
   },
   created() {
-    // Load user data from localStorage
     this.loadUserData();
-    
-    // Fetch drafts on component creation
     this.fetchDrafts();
   },
   methods: {
@@ -233,29 +230,19 @@ export default {
           }, 2000);
           return;
         }
-        
-        // Pre-fill form with user data from profile
         this.form.email = this.user.email || '';
         this.form.fullName = this.user.name || '';
         this.form.studentId = this.user.student_no || '';
-        
-        // Specifically ensure these fields are properly populated
         this.form.faculty = this.user.faculty || '';
         this.form.fieldOfStudy = this.user.branch || '';
         this.form.contactNumber = this.user.contactNumber || '';
-        
         this.form.signature = this.user.name || '';
       } else {
         this.showPopupMessage('กรุณาล็อกอินก่อนยื่นคำร้อง');
         setTimeout(() => {
           this.$router.push('/login');
         }, 2000);
-        return;
       }
-    },
-    refreshUserData() {
-      // This method can be called to refresh user data if needed
-      this.loadUserData();
     },
     async fetchDrafts() {
       try {
@@ -263,20 +250,8 @@ export default {
         this.drafts = response.data;
         this.draftCount = this.drafts.length;
       } catch (error) {
-        if (error.response?.status === 401) {
-          this.showPopupMessage('กรุณาล็อกอินใหม่');
-          setTimeout(() => {
-            localStorage.removeItem('user');
-            this.$router.push('/login');
-          }, 2000);
-        } else {
-          this.showPopupMessage('เกิดข้อผิดพลาดในการดึงแบบร่าง: ' + (error.response?.data?.message || error.message));
-        }
+        this.handleError(error, 'เกิดข้อผิดพลาดในการดึงแบบร่าง');
       }
-    },
-    async showDrafts() {
-      await this.fetchDrafts();
-      this.showDraftsModal = true;
     },
     async loadDraft(draftId) {
       try {
@@ -292,21 +267,13 @@ export default {
           petitionType: response.data.petitionType,
           details: response.data.details,
           contactNumber: response.data.contactNumber,
-          email: this.user.email, // Keep user email
+          email: this.user.email,
           signature: response.data.signature,
         };
         this.showDraftsModal = false;
         this.showPopupMessage('โหลดแบบร่างสำเร็จ!');
       } catch (error) {
-        if (error.response?.status === 401) {
-          this.showPopupMessage('กรุณาล็อกอินใหม่');
-          setTimeout(() => {
-            localStorage.removeItem('user');
-            this.$router.push('/login');
-          }, 2000);
-        } else {
-          this.showPopupMessage('เกิดข้อผิดพลาดในการโหลดแบบร่าง: ' + (error.response?.data?.message || error.message));
-        }
+        this.handleError(error, 'เกิดข้อผิดพลาดในการโหลดแบบร่าง');
       }
     },
     async deleteDraft(draftId) {
@@ -317,15 +284,7 @@ export default {
           this.draftCount = this.drafts.length;
           this.showPopupMessage('ลบแบบร่างสำเร็จ!');
         } catch (error) {
-          if (error.response?.status === 401) {
-            this.showPopupMessage('กรุณาล็อกอินใหม่');
-            setTimeout(() => {
-              localStorage.removeItem('user');
-              this.$router.push('/login');
-            }, 2000);
-          } else {
-            this.showPopupMessage('เกิดข้อผิดพลาดในการลบแบบร่าง: ' + (error.response?.data?.message || error.message));
-          }
+          this.handleError(error, 'เกิดข้อผิดพลาดในการลบแบบร่าง');
         }
       }
     },
@@ -358,25 +317,17 @@ export default {
         return;
       }
       try {
-      await this.$axios.post('/api/generalrequests', {
+        await this.$axios.post('/api/generalrequests', {
           ...this.form,
-          status: 'submitted',
+          status: 'pending_advisor',
         });
         this.showPopupMessage('คำร้องถูกส่งและบันทึกเรียบร้อยแล้ว!');
         this.resetForm();
         setTimeout(() => {
-          this.$router.push('/');
+          this.$router.push('/status');
         }, 2000);
       } catch (error) {
-        if (error.response?.status === 401) {
-          this.showPopupMessage('กรุณาล็อกอินใหม่');
-          setTimeout(() => {
-            localStorage.removeItem('user');
-            this.$router.push('/login');
-          }, 2000);
-        } else {
-          this.showPopupMessage('เกิดข้อผิดพลาดในการบันทึกคำร้อง: ' + (error.response?.data?.message || error.message));
-        }
+        this.handleError(error, 'เกิดข้อผิดพลาดในการบันทึกคำร้อง');
       }
     },
     async saveDraft() {
@@ -395,15 +346,7 @@ export default {
         this.draftCount = this.drafts.length;
         this.showPopupMessage(`บันทึกแบบร่างสำเร็จ! คุณมีแบบร่างทั้งหมด ${this.draftCount} ฉบับ`);
       } catch (error) {
-        if (error.response?.status === 401) {
-          this.showPopupMessage('กรุณาล็อกอินใหม่');
-          setTimeout(() => {
-            localStorage.removeItem('user');
-            this.$router.push('/login');
-          }, 2000);
-        } else {
-          this.showPopupMessage('เกิดข้อผิดพลาดในการบันทึกแบบร่าง: ' + (error.response?.data?.message || error.message));
-        }
+        this.handleError(error, 'เกิดข้อผิดพลาดในการบันทึกแบบร่าง');
       }
     },
     resetForm() {
@@ -438,6 +381,17 @@ export default {
     closePopup() {
       this.showPopup = false;
       this.popupMessage = '';
+    },
+    handleError(error, defaultMessage) {
+      if (error.response?.status === 401) {
+        this.showPopupMessage('กรุณาล็อกอินใหม่');
+        setTimeout(() => {
+          localStorage.removeItem('user');
+          this.$router.push('/login');
+        }, 2000);
+      } else {
+        this.showPopupMessage(`${defaultMessage}: ${error.response?.data?.message || error.message}`);
+      }
     },
   },
 };

@@ -25,7 +25,6 @@
 
     <!-- Status Body -->
     <div class="status-body">
-      <!-- Loading and Error States -->
       <div v-if="isLoading" class="loading">กำลังโหลดข้อมูล...</div>
       <div v-else-if="errorMessage" class="error-message">{{ errorMessage }}</div>
       <div v-else>
@@ -35,7 +34,7 @@
             <input
               type="text"
               v-model="searchQuery"
-              placeholder="ค้นหาคำร้อง (เช่น รายวิชา, ประเภทคำร้อง)"
+              placeholder="ค้นหาคำร้อง (เช่น ประเภทคำร้อง)"
               @input="filterRequests"
             />
             <i class="fas fa-search"></i>
@@ -44,10 +43,12 @@
             <label>กรองสถานะ:</label>
             <select v-model="statusFilter" @change="filterRequests">
               <option value="">ทั้งหมด</option>
-              <option value="ร่าง">ร่าง</option>
-              <option value="รอพิจารณา">รอพิจารณา</option>
-              <option value="อนุมัติ">อนุมัติ</option>
-              <option value="ปฏิเสธ">ปฏิเสธ</option>
+              <option value="pending_advisor">รอพิจารณาโดยอาจารย์ที่ปรึกษา</option>
+              <option value="advisor_approved">อนุมัติโดยอาจารย์ที่ปรึกษา</option>
+              <option value="advisor_rejected">ปฏิเสธโดยอาจารย์ที่ปรึกษา</option>
+              <option value="pending_head">รอพิจารณาโดยหัวหน้าสาขา</option>
+              <option value="head_approved">อนุมัติโดยหัวหน้าสาขา</option>
+              <option value="head_rejected">ปฏิเสธโดยหัวหน้าสาขา</option>
             </select>
           </div>
         </div>
@@ -59,7 +60,6 @@
               <tr>
                 <th>วันที่ยื่น</th>
                 <th>ประเภทคำร้อง</th>
-                <th>รายวิชา</th>
                 <th>สถานะ</th>
                 <th>หมายเหตุ</th>
                 <th>การดำเนินการ</th>
@@ -67,21 +67,34 @@
             </thead>
             <tbody>
               <tr v-for="request in paginatedRequests" :key="request._id">
-                <td>{{ request.date }}</td>
-                <td>{{ request.type }}</td>
-                <td>{{ request.course }}</td>
+                <td>{{ formatDate(request.createdAt) }}</td>
+                <td>{{ petitionTypeLabels[request.petitionType] || request.petitionType }}</td>
                 <td>
-                  <span :class="getStatusClass(request.status)">{{ request.status }}</span>
+                  <span :class="getStatusClass(request.status)">{{ formatStatus(request.status) }}</span>
                 </td>
-                <td>{{ request.note || '-' }}</td>
+                <td>{{ request.advisorComment || request.headComment || '-' }}</td>
                 <td>
                   <button class="view-btn" @click="viewRequest(request)">
                     ดูรายละเอียด
                   </button>
+                  <button
+                    v-if="['pending_advisor', 'advisor_approved'].includes(request.status)"
+                    class="cancel-btn"
+                    @click="openConfirmModal(request)"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    v-if="request.status === 'head_approved'"
+                    class="download-btn"
+                    @click="downloadPDF(request._id)"
+                  >
+                    <i class="fas fa-file-pdf"></i> ดาวน์โหลด PDF
+                  </button>
                 </td>
               </tr>
               <tr v-if="paginatedRequests.length === 0">
-                <td colspan="6" class="no-data">ไม่พบคำร้องที่ตรงกับเงื่อนไข</td>
+                <td colspan="5" class="no-data">ไม่พบคำร้องที่ตรงกับเงื่อนไข</td>
               </tr>
             </tbody>
           </table>
@@ -125,25 +138,25 @@
                 </div>
                 <div class="detail-item">
                   <label><i class="fas fa-file-signature"></i> ประเภทคำร้อง:</label>
-                  <p>{{ selectedRequest.type }}</p>
+                  <p>{{ petitionTypeLabels[selectedRequest.petitionType] || selectedRequest.petitionType }}</p>
                 </div>
                 <div class="detail-item">
-                  <label><i class="fas fa-book"></i> รายวิชา:</label>
-                  <p class="highlight">{{ `${selectedRequest.courseCode} - ${selectedRequest.courseTitle}` }}</p>
-                </div>
-                <div class="detail-item">
-                  <label><i class="fas fa-graduation-cap"></i> หน่วยกิต:</label>
-                  <p>{{ selectedRequest.credits }}</p>
-                </div>
-                <div class="detail-item">
-                  <label><i class="fas fa-comment"></i> เหตุผล:</label>
-                  <p>{{ selectedRequest.reason }}</p>
+                  <label><i class="fas fa-comment"></i> รายละเอียด:</label>
+                  <p>{{ selectedRequest.details }}</p>
                 </div>
                 <div class="detail-item">
                   <label><i class="fas fa-info"></i> สถานะ:</label>
                   <p :class="getStatusClass(selectedRequest.status)" class="highlight">
                     {{ formatStatus(selectedRequest.status) }}
                   </p>
+                </div>
+                <div class="detail-item" v-if="selectedRequest.advisorComment">
+                  <label><i class="fas fa-comment-alt"></i> หมายเหตุจากอาจารย์ที่ปรึกษา:</label>
+                  <p>{{ selectedRequest.advisorComment }}</p>
+                </div>
+                <div class="detail-item" v-if="selectedRequest.headComment">
+                  <label><i class="fas fa-comment-alt"></i> หมายเหตุจากหัวหน้าสาขา:</label>
+                  <p>{{ selectedRequest.headComment }}</p>
                 </div>
               </div>
 
@@ -152,7 +165,7 @@
                 <h4><i class="fas fa-user"></i> ข้อมูลนักศึกษา</h4>
                 <div class="detail-item">
                   <label><i class="fas fa-user-circle"></i> ผู้ยื่น:</label>
-                  <p>{{ selectedRequest.studentName }} ({{ selectedRequest.studentId }})</p>
+                  <p>{{ selectedRequest.fullName }} ({{ selectedRequest.studentId }})</p>
                 </div>
                 <div class="detail-item">
                   <label><i class="fas fa-university"></i> คณะ:</label>
@@ -161,10 +174,6 @@
                 <div class="detail-item">
                   <label><i class="fas fa-graduation-cap"></i> สาขาวิชา:</label>
                   <p>{{ selectedRequest.fieldOfStudy }}</p>
-                </div>
-                <div class="detail-item">
-                  <label><i class="fas fa-layer-group"></i> ระดับการศึกษา:</label>
-                  <p>{{ selectedRequest.levelOfStudy.join(', ') }}</p>
                 </div>
               </div>
 
@@ -185,9 +194,6 @@
               <button class="modal-close-btn" @click="closeModal">
                 <i class="fas fa-times-circle"></i> ปิด
               </button>
-              <button class="modal-close-btn2" @click="cancelRequest">
-                <i class="fas fa-times-circle"></i> ยกเลิกคำร้อง
-              </button>
             </div>
           </div>
         </div>
@@ -200,7 +206,7 @@
             </div>
             <div class="confirm-modal-body">
               <p>คุณแน่ใจหรือไม่ว่าต้องการยกเลิกคำร้องนี้?</p>
-              <p class="highlight">{{ `${selectedRequest.courseCode} - ${selectedRequest.courseTitle}` }}</p>
+              <p class="highlight">{{ petitionTypeLabels[selectedRequest.petitionType] || selectedRequest.petitionType }}</p>
             </div>
             <div class="confirm-modal-footer">
               <button class="confirm-btn" @click="confirmCancel">
@@ -233,11 +239,16 @@ export default {
       showModal: false,
       showConfirmModal: false,
       selectedRequest: null,
-      // Notification data
       showNotification: false,
       notificationMessage: '',
       notificationType: 'success',
-      notificationIcon: 'fas fa-check-circle'
+      notificationIcon: 'fas fa-check-circle',
+      petitionTypeLabels: {
+        request_leave: 'ขอลา',
+        request_transcript: 'ขอใบระเบียนผลการศึกษา',
+        request_change_course: 'ขอเปลี่ยนแปลงรายวิชา',
+        other: 'อื่นๆ',
+      },
     };
   },
   computed: {
@@ -248,254 +259,133 @@ export default {
       const start = (this.currentPage - 1) * this.itemsPerPage;
       const end = start + this.itemsPerPage;
       return this.filteredRequests.slice(start, end);
-    }
+    },
+  },
+  created() {
+    this.fetchRequests();
   },
   methods: {
     async fetchRequests() {
       this.isLoading = true;
-      this.errorMessage = '';
       try {
-        // ดึงข้อมูลผู้ใช้จาก localStorage
-        const userData = JSON.parse(localStorage.getItem('user'));
-        if (!userData || !userData.email || !userData._id) {
-          throw new Error('ไม่พบข้อมูลผู้ใช้หรือข้อมูลไม่ครบถ้วน');
-        }
-
-        console.log('Fetching requests for:', userData.email, userData._id); // ดีบั๊ก
-
-        // ดึงข้อมูลจากทั้งสาม endpoints พร้อมกัน
-        const [openCourseResponse, addSeatResponse, generalRequestResponse] = await Promise.all([
-          this.$axios.get(`/api/opencourserequests?email=${userData.email}`),
-          this.$axios.get(`/api/addseatrequests?email=${userData.email}`),
-          this.$axios.get(`/api/generalrequests/by-email?email=${userData.email}`) // ใช้ endpoint by-email และส่ง email parameter
-        ]);
-
-        // แปลงข้อมูลจาก opencourserequests
-        const openCourseRequests = openCourseResponse.data.map(form => ({
-          _id: form._id,
-          date: this.formatDate(form.createdAt),
-          type: 'คำร้องขอเปิดรายวิชานอกแผน',
-          course: `${form.courseCode} - ${form.courseTitle}`,
-          status: this.formatStatus(form.status),
-          note: form.reason || '-',
-          createdAt: form.createdAt,
-          courseCode: form.courseCode,
-          courseTitle: form.courseTitle,
-          credits: form.credits,
-          reason: form.reason,
-          studentName: form.studentName,
-          studentId: form.studentId,
-          faculty: form.faculty,
-          fieldOfStudy: form.fieldOfStudy,
-          levelOfStudy: form.levelOfStudy,
-          contactNumber: form.contactNumber,
-          email: form.email
-        }));
-
-        // แปลงข้อมูลจาก addseatrequests
-        const addSeatRequests = addSeatResponse.data.map(form => ({
-          _id: form._id,
-          date: this.formatDate(form.createdAt),
-          type: 'คำร้องขอเพิ่มที่นั่ง',
-          course: `${form.courseCode} - ${form.courseTitle}`,
-          status: this.formatStatus(form.status),
-          note: form.reason || '-',
-          createdAt: form.createdAt,
-          courseCode: form.courseCode,
-          courseTitle: form.courseTitle,
-          credits: form.credits,
-          reason: form.reason,
-          studentName: form.studentName,
-          studentId: form.studentId,
-          faculty: form.faculty,
-          fieldOfStudy: form.fieldOfStudy,
-          levelOfStudy: form.levelOfStudy,
-          contactNumber: form.contactNumber,
-          email: form.email
-        }));
-
-        // แปลงข้อมูลจาก generalrequests
-        const generalRequests = generalRequestResponse.data.map(form => ({
-          _id: form._id,
-          date: this.formatDate(form.createdAt),
-          type: 'คำร้องทั่วไป',
-          course: this.getPetitionTypeLabel(form.petitionType), // ใช้ประเภทคำร้องเป็นชื่อวิชา
-          status: this.formatStatus(form.status),
-          note: form.details || '-',
-          createdAt: form.createdAt,
-          courseCode: '', // คำร้องทั่วไปไม่มีรหัสวิชา
-          courseTitle: this.getPetitionTypeLabel(form.petitionType),
-          reason: form.details,
-          studentName: form.fullName,
-          studentId: form.studentId,
-          faculty: form.faculty,
-          fieldOfStudy: form.fieldOfStudy,
-          contactNumber: form.contactNumber,
-          email: form.email,
-          levelOfStudy: ['ไม่ระบุ'], // ค่าเริ่มต้นสำหรับคำร้องทั่วไป
-          petitionType: form.petitionType
-        }));
-
-        // รวมข้อมูลและกรองโดย userId เพื่อความมั่นใจ
-        this.requests = [...openCourseRequests, ...addSeatRequests, ...generalRequests].filter(
-          request => request.email === userData.email
-        );
-
-        // เรียงลำดับตามวันที่จากใหม่ไปเก่า
-        this.requests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        this.filteredRequests = [...this.requests];
-
-        console.log('Fetched requests:', this.requests); // ดีบั๊ก
+        const response = await this.$axios.get('/api/generalrequests');
+        this.requests = response.data;
+        this.filterRequests();
       } catch (error) {
-        console.error('เกิดข้อผิดพลาดในการดึงข้อมูล:', error);
-        this.errorMessage = 'ไม่สามารถโหลดข้อมูลคำร้องได้ กรุณาลองใหม่';
+        this.errorMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการดึงข้อมูลคำร้อง';
+        this.showNotification = true;
+        this.notificationMessage = this.errorMessage;
+        this.notificationType = 'error';
+        this.notificationIcon = 'fas fa-exclamation-circle';
       } finally {
         this.isLoading = false;
       }
     },
-    formatDate(dateString) {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('th-TH', {
-        day: '2-digit',
+    filterRequests() {
+      this.filteredRequests = this.requests.filter(request => {
+        const matchesSearch = this.searchQuery
+          ? (this.petitionTypeLabels[request.petitionType] || request.petitionType)
+              .toLowerCase()
+              .includes(this.searchQuery.toLowerCase())
+          : true;
+        const matchesStatus = this.statusFilter
+          ? request.status === this.statusFilter
+          : true;
+        return matchesSearch && matchesStatus;
+      });
+      this.currentPage = 1;
+    },
+    formatDate(date) {
+      return new Date(date).toLocaleDateString('th-TH', {
+        year: 'numeric',
         month: '2-digit',
-        year: 'numeric'
+        day: '2-digit',
       });
     },
     formatStatus(status) {
-      switch (status) {
-        case 'draft':
-          return 'ร่าง';
-        case 'submitted':
-          return 'รอพิจารณา';
-        case 'approved':
-          return 'อนุมัติ';
-        case 'rejected':
-          return 'ปฏิเสธ';
-        default:
-          return status;
-      }
+      const statusLabels = {
+        pending_advisor: 'รอพิจารณาโดยอาจารย์ที่ปรึกษา',
+        advisor_approved: 'อนุมัติโดยอาจารย์ที่ปรึกษา',
+        advisor_rejected: 'ปฏิเสธโดยอาจารย์ที่ปรึกษา',
+        pending_head: 'รอพิจารณาโดยหัวหน้าสาขา',
+        head_approved: 'อนุมัติโดยหัวหน้าสาขา',
+        head_rejected: 'ปฏิเสธโดยหัวหน้าสาขา',
+      };
+      return statusLabels[status] || status;
     },
     getStatusClass(status) {
-      if (status === 'รอพิจารณา') return 'status-pending';
-      if (status === 'อนุมัติ') return 'status-approved';
-      if (status === 'ปฏิเสธ') return 'status-rejected';
-      if (status === 'ร่าง') return 'status-draft';
-      return '';
-    },
-    filterRequests() {
-      let filtered = this.requests;
-
-      if (this.searchQuery) {
-        const query = this.searchQuery.toLowerCase();
-        filtered = filtered.filter(
-          request =>
-            request.type.toLowerCase().includes(query) ||
-            request.course.toLowerCase().includes(query)
-        );
-      }
-
-      if (this.statusFilter) {
-        filtered = filtered.filter(request => request.status === this.statusFilter);
-      }
-
-      this.filteredRequests = filtered;
-      this.currentPage = 1;
+      const statusClasses = {
+        pending_advisor: 'status-pending',
+        advisor_approved: 'status-approved',
+        advisor_rejected: 'status-rejected',
+        pending_head: 'status-pending',
+        head_approved: 'status-approved',
+        head_rejected: 'status-rejected',
+      };
+      return statusClasses[status] || '';
     },
     viewRequest(request) {
       this.selectedRequest = request;
       this.showModal = true;
     },
-    closeModal() {
-      this.showModal = false;
-      this.selectedRequest = null;
-    },
-    cancelRequest() {
-      // แสดงป็อปอัพยืนยัน
+    openConfirmModal(request) {
+      this.selectedRequest = request;
       this.showConfirmModal = true;
-    },
-    closeConfirmModal() {
-      this.showConfirmModal = false;
     },
     async confirmCancel() {
       try {
-        // ตรวจสอบว่า selectedRequest มีค่าและมี _id
-        if (!this.selectedRequest || !this.selectedRequest._id) {
-          throw new Error('ไม่พบข้อมูลคำร้องที่เลือก');
-        }
-
-        // กำหนด endpoint ตามประเภทคำร้อง
-        let endpoint;
-        if (this.selectedRequest.type === 'คำร้องขอเปิดรายวิชานอกแผน') {
-          endpoint = `/api/opencourserequests/${this.selectedRequest._id}`;
-        } else if (this.selectedRequest.type === 'คำร้องขอเพิ่มที่นั่ง') {
-          endpoint = `/api/addseatrequests/${this.selectedRequest._id}`;
-        } else if (this.selectedRequest.type === 'คำร้องทั่วไป') {
-          endpoint = `/api/generalrequests/${this.selectedRequest._id}/cancel`;
-        }
-
-        // ส่งคำขอ DELETE ไปยัง backend
-        await this.$axios.delete(endpoint);
-
-        // แสดง notification
+        await this.$axios.delete(`/api/generalrequests/${this.selectedRequest._id}/cancel`);
         this.showNotification = true;
         this.notificationMessage = 'ยกเลิกคำร้องสำเร็จ';
         this.notificationType = 'success';
         this.notificationIcon = 'fas fa-check-circle';
-
-        // ลบคำร้องออกจาก state
-        this.requests = this.requests.filter(
-          request => request._id !== this.selectedRequest._id
-        );
-        this.filteredRequests = this.filteredRequests.filter(
-          request => request._id !== this.selectedRequest._id
-        );
-
-        // ปิด modals ทั้งสอง
+        this.requests = this.requests.filter(r => r._id !== this.selectedRequest._id);
+        this.filterRequests();
         this.closeConfirmModal();
-        this.closeModal();
-
-        // รีเซ็ตหน้า pagination ถ้าจำเป็น
-        if (this.filteredRequests.length === 0 && this.currentPage > 1) {
-          this.currentPage--;
-        }
-
-        // Auto-hide notification หลัง 5 วินาที
-        setTimeout(() => {
-          this.closeNotification();
-        }, 5000);
       } catch (error) {
-        console.error('เกิดข้อผิดพลาดในการยกเลิกคำร้อง:', error);
-        // แสดง notification ข้อผิดพลาด
         this.showNotification = true;
-        this.notificationMessage = 'ไม่สามารถยกเลิกคำร้องได้ กรุณาลองใหม่';
+        this.notificationMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการยกเลิกคำร้อง';
         this.notificationType = 'error';
         this.notificationIcon = 'fas fa-exclamation-circle';
-
-        // ปิด confirm modal
-        this.closeConfirmModal();
-
-        // Auto-hide notification หลัง 5 วินาที
-        setTimeout(() => {
-          this.closeNotification();
-        }, 5000);
       }
+    },
+    closeModal() {
+      this.showModal = false;
+      this.selectedRequest = null;
+    },
+    closeConfirmModal() {
+      this.showConfirmModal = false;
+      this.selectedRequest = null;
     },
     closeNotification() {
       this.showNotification = false;
+      this.notificationMessage = '';
     },
-    getPetitionTypeLabel(petitionType) {
-      const petitionTypeLabels = {
-        request_leave: 'ขอลา',
-        request_transcript: 'ขอใบระเบียนผลการศึกษา',
-        request_change_course: 'ขอเปลี่ยนแปลงรายวิชา',
-        other: 'อื่นๆ'
-      };
-      return petitionTypeLabels[petitionType] || petitionType;
-    }
+    async downloadPDF(requestId) {
+      try {
+        const response = await this.$axios.get(`/api/generalrequests/${requestId}/pdf`, {
+          responseType: 'blob',
+        });
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `general_request_${requestId}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        this.showNotification = true;
+        this.notificationMessage = 'ดาวน์โหลด PDF สำเร็จ';
+        this.notificationType = 'success';
+        this.notificationIcon = 'fas fa-check-circle';
+      } catch (error) {
+        this.showNotification = true;
+        this.notificationMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการดาวน์โหลด PDF';
+        this.notificationType = 'error';
+        this.notificationIcon = 'fas fa-exclamation-circle';
+      }
+    },
   },
-  async created() {
-    await this.fetchRequests();
-  }
 };
 </script>
 
@@ -839,12 +729,12 @@ export default {
 }
 
 .status-approved {
-  color: #2ecc71;
+  color: #10b981;
   font-weight: 500;
 }
 
 .status-rejected {
-  color: #e74c3c;
+  color: #ef4444;
   font-weight: 500;
 }
 
@@ -1225,24 +1115,45 @@ export default {
 }
 
 .cancel-btn {
-  padding: 10px 20px;
-  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-  color: white;
+  padding: 8px 15px;
+  background: #ef4444;
+  color: #ffffff;
   border: none;
-  border-radius: 5px;
+  border-radius: 8px;
   font-family: 'Kanit', sans-serif;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: transform 0.3s, box-shadow 0.3s;
+  margin-left: 10px;
+  transition: background 0.3s, transform 0.3s;
 }
 
 .cancel-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+  background: #dc2626;
+  transform: translateY(-2px);
+}
+
+.download-btn {
+  padding: 8px 15px;
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Kanit', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-left: 10px;
+  transition: background 0.3s, transform 0.3s;
+}
+
+.download-btn:hover {
+  background: #059669;
+  transform: translateY(-2px);
+}
+
+.download-btn i {
+  margin-right: 5px;
 }
 
 /* Responsive Design */
