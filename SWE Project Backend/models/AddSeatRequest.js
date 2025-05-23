@@ -9,7 +9,7 @@ const addSeatRequestSchema = new mongoose.Schema({
   lecturer: { type: String, required: true, trim: true },
   studentName: { type: String, required: true, trim: true },
   studentId: { type: String, required: true, trim: true },
-  levelOfStudy: { type: [String], required: true },
+  levelOfStudy: { type: String, required: true }, // เปลี่ยนจาก [String] เป็น String เพราะเป็น radio button
   faculty: { type: String, required: true, trim: true },
   fieldOfStudy: { type: String, required: true, trim: true },
   classLevel: { type: String, required: true, trim: true },
@@ -25,9 +25,10 @@ const addSeatRequestSchema = new mongoose.Schema({
   signature: { type: String, required: true, trim: true },
   status: {
     type: String,
-    enum: ['draft', 'submitted'],
+    enum: ['draft', 'submitted', 'instructor_approved', 'instructor_rejected'],
     default: 'draft'
   },
+  instructorComment: { type: String, trim: true }, // หมายเหตุจากอาจารย์
   userId: {
     type: String,
     required: true,

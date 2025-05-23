@@ -244,6 +244,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Add new endpoint for generating PDF
+
 router.get('/:id/pdf', async (req, res) => {
   try {
     const { id } = req.params;
@@ -267,7 +268,6 @@ router.get('/:id/pdf', async (req, res) => {
 
     // Get the first page
     const page = pdfDoc.getPages()[0];
-    const { width, height } = page.getSize();
 
     // Define text options
     const fontSize = 14;
@@ -290,70 +290,74 @@ router.get('/:id/pdf', async (req, res) => {
       const day = date.getDate().toString().padStart(2, '0');
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
       const year = date.getFullYear() + 543; // Convert to Thai Buddhist year
-      return `${day}/${month}/${year}`;
+      return ${day}/${month}/${year};
     };
 
-    // Fill in the form fields
-    // Date (top right)
-    drawText(formatThaiDate(request.createdAt), 480, height - 50);
+    // Fill in the form fields using x,y coordinates
+    // // Date (top right)
+    // drawText(formatThaiDate(request.createdAt), 339.40, 730.93);
+
+    drawText(request.semester || '', 402.88, 769.43);
+    drawText(request.academicYear || '', 485.35, 769.43);
+
+    // Date
+    drawText(request.date || '', 333.90, 731.43);
+
+    // Month
+    drawText(request.month || '', 381.88, 731.43);
+
+    // Year
+    drawText(request.year || '', 455.86, 731.43);
 
     // Dean
-    drawText(request.dean || 'คณบดีคณะวิศวกรรมศาสตร์', 120, height - 100);
+    drawText(request.dean || 'คณบดีคณะวิศวกรรมศาสตร์', 133.96, 711.43);
 
     // Student Name
-    drawText(request.studentName, 150, height - 150);
+    drawText(request.studentName || '', 205.44, 682.43);
 
     // Student ID
-    drawText(request.studentId, 400, height - 150);
-
-    // Level of Study (checkbox)
-    const level = request.levelOfStudy;
-    if (level === 'ปริญญาตรี') {
-      page.drawText('☑', { x: 120, y: height - 180, size: 12, font: thaiFont, color: textColor });
-    } else if (level === 'ปริญญาโท') {
-      page.drawText('☑', { x: 220, y: height - 180, size: 12, font: thaiFont, color: textColor });
-    } else if (level === 'ปริญญาเอก') {
-      page.drawText('☑', { x: 320, y: height - 180, size: 12, font: thaiFont, color: textColor });
-    }
+    drawText(request.studentId || '', 443.87, 682.43);
 
     // Faculty
-    drawText(request.faculty, 120, height - 210);
+    drawText(request.faculty || '', 111.47, 631.43);
 
     // Field of Study
-    drawText(request.fieldOfStudy, 120, height - 240);
+    drawText(request.fieldOfStudy || '', 356.39, 631.43);
 
     // Semester
-    drawText(request.semester, 120, height - 240);
+    drawText(request.semester || '', 422.87, 604.43);
 
     // Academic Year
-    drawText(request.academicYear, 300, height - 240);
+    drawText(request.academicYear || '', 514.84, 604.43);
 
     // Course Code
-    drawText(request.courseCode, 120, height - 270);
+    drawText(request.courseCode || '', 115.47, 582.43);
 
     // Course Title
-    drawText(request.courseTitle, 300, height - 270);
+    drawText(request.courseTitle || '', 286.91, 582.43);
 
     // Reason
-    const reasonLines = request.reason.match(/.{1,50}/g) || [request.reason];
-    reasonLines.forEach((line, index) => {
-      drawText(line, 120, height - 300 - index * 20);
-    });
+    if (request.reason) {
+      const reasonLines = request.reason.match(/.{1,50}/g) || [request.reason];
+      reasonLines.forEach((line, index) => {
+        drawText(line, 98.47, 553.43 - index * 20);
+      });
+    }
 
     // Contact Number
-    drawText(request.contactNumber, 120, height - 400);
+    drawText(request.contactNumber || '', 99.47, 486.43);
 
     // Email
-    drawText(request.email, 300, height - 400);
+    drawText(request.email || '', 99.97, 472.43);
 
     // Signature (as text, assuming signature is stored as a string)
-    drawText(request.signature || request.studentName, 400, height - 450);
+    drawText(request.signature || request.studentName || '', 385.97, 477.43);
 
     // Save PDF
     const pdfBytesModified = await pdfDoc.save();
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename=RE07_${id}.pdf`,
+      'Content-Disposition': attachment; filename=RE07_${id}.pdf
     });
     res.send(Buffer.from(pdfBytesModified));
   } catch (error) {

@@ -85,7 +85,7 @@
                     ยกเลิก
                   </button>
                   <button
-                    v-if="request.status === 'head_approved'"
+                    v-if="request.status === 'head_approved' || request.status === 'instructor_approved'"
                     class="download-btn"
                     @click="downloadPDF(request._id, request.requestType)"
                   >
@@ -240,7 +240,8 @@ export default {
         request_transcript: 'ขอใบระเบียนผลการศึกษา',
         request_change_course: 'ขอเปลี่ยนแปลงรายวิชา',
         other: 'อื่นๆ',
-        open_course: 'ขอเปิดรายวิชานอกแผนการเรียน'
+        open_course: 'ขอเปิดรายวิชานอกแผนการเรียน',
+        add_seat: 'ขอเพิ่มที่นั่ง' // เพิ่มสำหรับ AddSeatRequest
       }
     };
   },
@@ -264,28 +265,32 @@ export default {
     }
   },
   methods: {
-async fetchRequests() {
-  this.isLoading = true;
-  try {
-    const [generalResponse, openCourseResponse] = await Promise.all([
-      axios.get(`/api/generalrequests?userId=${this.user._id}`), // แก้ไข endpoint
-      axios.get(`/api/opencourserequests/opencourserequests?userId=${this.user._id}`)
-    ]);
+    async fetchRequests() {
+      this.isLoading = true;
+      try {
+        const [generalResponse, openCourseResponse, addSeatResponse] = await Promise.all([
+          axios.get(`/api/generalrequests?userId=${this.user._id}`),
+          axios.get(`/api/opencourserequests/opencourserequests?userId=${this.user._id}`),
+          axios.get(`/api/addseatrequests/addseatrequests?userId=${this.user._id}`)
+        ]);
 
-    this.requests = [
-      ...generalResponse.data.map(req => ({ ...req, requestType: 'general' })),
-      ...openCourseResponse.data
-        .filter(req => req.status !== 'draft')
-        .map(req => ({ ...req, requestType: 'open_course', petitionType: 'open_course' }))
-    ];
-    this.filterRequests();
-  } catch (error) {
-    console.error('Error fetching requests:', error);
-    this.errorMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูลคำร้อง';
-  } finally {
-    this.isLoading = false;
-  }
-},
+        this.requests = [
+          ...generalResponse.data.map(req => ({ ...req, requestType: 'general' })),
+          ...openCourseResponse.data
+            .filter(req => req.status !== 'draft')
+            .map(req => ({ ...req, requestType: 'open_course', petitionType: 'open_course' })),
+          ...addSeatResponse.data
+            .filter(req => req.status !== 'draft')
+            .map(req => ({ ...req, requestType: 'add_seat', petitionType: 'add_seat' }))
+        ];
+        this.filterRequests();
+      } catch (error) {
+        console.error('Error fetching requests:', error);
+        this.errorMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูลคำร้อง';
+      } finally {
+        this.isLoading = false;
+      }
+    },
     filterRequests() {
       let filtered = this.requests;
 
@@ -312,12 +317,16 @@ async fetchRequests() {
     getPetitionTypeLabel(request) {
       if (request.requestType === 'open_course') {
         return this.petitionTypeLabels['open_course'];
+      } else if (request.requestType === 'add_seat') {
+        return this.petitionTypeLabels['add_seat'];
       }
       return this.petitionTypeLabels[request.petitionType] || request.petitionType;
     },
     getRequestDetails(request) {
       if (request.requestType === 'open_course') {
         return `รหัสวิชา: ${request.courseCode}, ชื่อวิชา: ${request.courseTitle}, เหตุผล: ${request.reason}`;
+      } else if (request.requestType === 'add_seat') {
+        return `รหัสวิชา: ${request.courseCode}, ชื่อวิชา: ${request.courseTitle}, ตอนเรียน: ${request.section}`;
       }
       return request.details;
     },
@@ -335,7 +344,10 @@ async fetchRequests() {
         advisor_rejected: 'ปฏิเสธโดยอาจารย์ที่ปรึกษา',
         pending_head: 'รอพิจารณาโดยหัวหน้าสาขา',
         head_approved: 'อนุมัติโดยหัวหน้าสาขา',
-        head_rejected: 'ปฏิเสธโดยหัวหน้าสาขา'
+        head_rejected: 'ปฏิเสธโดยหัวหน้าสาขา',
+        submitted: 'รอยื่นยันโดยอาจารย์ประจำวิชา',
+        instructor_approved: 'อนุมัติโดยอาจารย์ประจำวิชา',
+        instructor_rejected: 'ปฏิเสธโดยอาจารย์ประจำวิชา'
       };
       return statusLabels[status] || status;
     },
@@ -346,7 +358,10 @@ async fetchRequests() {
         advisor_rejected: 'status-rejected',
         pending_head: 'status-pending',
         head_approved: 'status-approved',
-        head_rejected: 'status-rejected'
+        head_rejected: 'status-rejected',
+        submitted: 'status-pending',
+        instructor_approved: 'status-approved',
+        instructor_rejected: 'status-rejected'
       };
       return statusClasses[status] || '';
     },
@@ -370,6 +385,8 @@ async fetchRequests() {
       try {
         const endpoint = this.selectedRequest.requestType === 'open_course'
           ? `/api/opencourserequests/${this.selectedRequest._id}/reject`
+          : this.selectedRequest.requestType === 'add_seat'
+          ? `/api/addseatrequests/${this.selectedRequest._id}/reject`
           : `/api/generalrequests/${this.selectedRequest._id}/reject`;
         await axios.post(endpoint, { comment: 'ยกเลิกโดยนักศึกษา' });
         this.showNotification = true;
@@ -388,10 +405,17 @@ async fetchRequests() {
     async downloadPDF(requestId, requestType) {
       const endpoint = requestType === 'open_course'
         ? `/api/opencourserequests/${requestId}/pdf`
+        : requestType === 'add_seat'
+        ? `/api/addseatrequests/${requestId}/pdf`
         : `/api/generalrequests/${requestId}/pdf`;
       try {
+        console.log(`Downloading PDF from: ${endpoint}`);
         const response = await axios.get(endpoint, { responseType: 'blob' });
-        const fileName = requestType === 'open_course' ? `RE07_${requestId}.pdf` : `GeneralRequest_${requestId}.pdf`;
+        const fileName = requestType === 'open_course' 
+          ? `RE07_${requestId}.pdf` 
+          : requestType === 'add_seat' 
+          ? `RE06_${requestId}.pdf` 
+          : `GeneralRequest_${requestId}.pdf`;
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
