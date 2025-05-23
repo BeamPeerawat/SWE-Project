@@ -1,16 +1,12 @@
 <template>
   <div id="app">
-    <!-- แสดง Navbar และ Sidebar เฉพาะเมื่อไม่ได้อยู่ในหน้า Landing -->
-    <template v-if="$route.name !== 'LandingPage'">
-      <NavBar @toggle-sidebar="toggleSidebar" />
-      <SideBar v-if="userRole === 'student'" :isOpen="sidebarOpen" @toggle-sidebar="toggleSidebar" />
-      <AdvisorSidebar v-if="userRole === 'advisor'" :isOpen="sidebarOpen" @toggle-sidebar="toggleSidebar" />
-      <!-- เพิ่ม Sidebar สำหรับบทบาทอื่นๆ ในอนาคต -->
-      <InstructorSidebar v-if="userRole === 'instructor'" :isOpen="sidebarOpen" @toggle-sidebar="toggleSidebar" />
-      <HeadSidebar v-if="userRole === 'head'" :isOpen="sidebarOpen" @toggle-sidebar="toggleSidebar" />
-      <AdminSidebar v-if="userRole === 'admin'" :isOpen="sidebarOpen" @toggle-sidebar="toggleSidebar" />
-    </template>
-    <div class="main-content" :class="{ 'shifted': sidebarOpen && $route.name !== 'Landing' }">
+    <NavBar @toggle-sidebar="toggleSidebar" />
+    <SideBar v-if="userRole === 'student'" :isOpen="sidebarOpen" @toggle-sidebar="toggleSidebar" />
+    <AdvisorSidebar v-if="userRole === 'advisor'" :isOpen="sidebarOpen" @toggle-sidebar="toggleSidebar" />
+    <InstructorSidebar v-if="userRole === 'instructor'" :isOpen="sidebarOpen" @toggle-sidebar="toggleSidebar" />
+    <HeadSidebar v-if="userRole === 'head'" :isOpen="sidebarOpen" @toggle-sidebar="toggleSidebar" />
+    <AdminSidebar v-if="userRole === 'admin'" :isOpen="sidebarOpen" @toggle-sidebar="toggleSidebar" />
+    <div class="main-content" :class="{ 'shifted': sidebarOpen }">
       <router-view></router-view>
     </div>
   </div>
@@ -54,16 +50,14 @@ export default {
     },
   },
   watch: {
-    '$route'(to) {
+    '$route'() {
       // อัปเดต userRole เมื่อเปลี่ยนหน้า
-      if (to.name === 'Landing') {
-        this.userRole = null;
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        this.userRole = user.role || null;
       } else {
-        const userData = localStorage.getItem('user');
-        if (userData) {
-          const user = JSON.parse(userData);
-          this.userRole = user.role || null;
-        }
+        this.userRole = null;
       }
     },
   },

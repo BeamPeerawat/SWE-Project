@@ -271,7 +271,7 @@ export default {
         const [generalResponse, openCourseResponse, addSeatResponse] = await Promise.all([
           axios.get(`/api/generalrequests?userId=${this.user._id}`),
           axios.get(`/api/opencourserequests/opencourserequests?userId=${this.user._id}`),
-          axios.get(`/api/addseatrequests/addseatrequests?userId=${this.user._id}`)
+          axios.get(`/api/addseatrequests/user/${this.user._id}`), // Updated endpoint
         ]);
 
         this.requests = [
@@ -281,7 +281,7 @@ export default {
             .map(req => ({ ...req, requestType: 'open_course', petitionType: 'open_course' })),
           ...addSeatResponse.data
             .filter(req => req.status !== 'draft')
-            .map(req => ({ ...req, requestType: 'add_seat', petitionType: 'add_seat' }))
+            .map(req => ({ ...req, requestType: 'add_seat', petitionType: 'add_seat' })),
         ];
         this.filterRequests();
       } catch (error) {

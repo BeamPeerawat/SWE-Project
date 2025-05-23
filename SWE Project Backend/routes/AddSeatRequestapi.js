@@ -15,6 +15,13 @@ const ensureInstructor = (req, res, next) => {
   res.status(403).json({ message: 'เฉพาะอาจารย์ประจำวิชาเท่านั้น' });
 };
 
+const ensureAuthenticated = (req, res, next) => {
+  if (req.user) {
+    return next();
+  }
+  res.status(401).json({ message: 'กรุณาล็อกอินเพื่อเข้าถึงทรัพยากรนี้' });
+};
+
 // GET all draft forms for a user
 router.get('/drafts/:userId', async (req, res) => {
   try {
@@ -39,10 +46,24 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET เพิ่มคำขอที่นั่งสำหรับผู้ใช้เฉพาะ (นักเรียนสามารถเข้าถึงได้)
+router.get('/user/:userId', ensureAuthenticated, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    // Ensure the authenticated user is fetching their own data
+    if (req.user._id.toString() !== userId) {
+      return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลของผู้ใช้คนอื่น' });
+    }
+    const requests = await AddSeatRequest.find({ userId, status: { $ne: 'draft' } }).select('-__v');
+    res.json(requests);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // GET add seat requests for instructors
 router.get('/addseatrequests', ensureInstructor, async (req, res) => {
   try {
-    // คืนคำร้องทั้งหมดที่มีสถานะ submitted สำหรับอาจารย์
     const requests = await AddSeatRequest.find({ status: 'submitted' }).select('-__v');
     res.json(requests);
   } catch (error) {
@@ -246,9 +267,9 @@ const drawText = (text, x, y, size = 16, maxWidth = Infinity) => {
     drawText(request.classLevel, 527.48, 619.56); // ชั้นปี
     drawText(request.courseCode, 53.12, 462.40); // รหัสวิชา
     drawText(request.courseTitle, 157.44, 462.40, 14, 250); // ชื่อวิชา
-    drawText(request.section, 342.40, 462.40); // กลุ่มเรียน
+    drawText(request.section, 330.40, 462.40); // กลุ่มเรียน
     // drawText(request.credits, 450, 340); // หน่วยกิต
-    drawText(request.day, 387.84, 462.40); // ยอดลงทะเบียน
+    drawText(request.day, 382.84, 462.40); // ยอดลงทะเบียน
     // drawText(request.time, 510, 340); // เวลา
     // drawText(request.room, 550, 340); // ห้อง
     drawText(request.contactNumber, 106.88, 332.20); // เบอร์โทร

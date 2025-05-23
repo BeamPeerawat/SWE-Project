@@ -123,9 +123,9 @@
                 <tr>
                   <th>รหัสวิชา</th>
                   <th>ชื่อวิชา</th>
-                  <th>ตอนเรียน</th>
+                  <th>กลุ่มเรียน Section</th>
                   <th>หน่วยกิต</th>
-                  <th>วัน</th>
+                  <th>ปัจจุบันลงทะเบียนแล้ว (คน)</th>
                   <th>เวลา</th>
                   <th>ห้อง</th>
                 </tr>
@@ -141,9 +141,9 @@
                     </select>
                   </td>
                   <td><input type="text" v-model="form.courseTitle" placeholder="ชื่อวิชาภาษาอังกฤษ" readonly /></td>
-                  <td><input type="text" v-model="form.section" placeholder="ตอนเรียน" required /></td>
+                  <td><input type="text" v-model="form.section" placeholder="กลุ่มเรียน" required /></td>
                   <td><input type="text" v-model="form.credits" placeholder="หน่วยกิต" readonly /></td>
-                  <td><input type="text" v-model="form.day" placeholder="วัน" required /></td>
+                  <td><input type="text" v-model="form.day" placeholder="ยอดลงทะเบียน" required /></td>
                   <td><input type="text" v-model="form.time" placeholder="เวลา" required /></td>
                   <td><input type="text" v-model="form.room" placeholder="ห้อง" required /></td>
                 </tr>

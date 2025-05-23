@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import Landing from '../views/Landing.vue'; // เพิ่มหน้า Landing
 import Home from '../views/Home.vue';
 import Login from '../views/Login.vue';
 import AddSeat from '../views/AddSeat.vue';
@@ -27,8 +26,15 @@ import HeadOpenRequestDetail from '../views/HeadOpenRequestDetail.vue';
 const routes = [
   {
     path: '/',
-    name: 'LandingPage',
-    component: Landing,
+    redirect: () => {
+      const user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : {};
+      if (user.role === 'student') return '/home';
+      if (user.role === 'advisor') return '/advisor/home';
+      if (user.role === 'instructor') return '/instructor/home';
+      if (user.role === 'head') return '/head/home';
+      if (user.role === 'admin') return '/admin/dashboard';
+      return '/login'; // ถ้าไม่มีผู้ใช้ล็อกอิน ไปที่หน้า login
+    },
   },
   {
     path: '/login',
@@ -97,7 +103,8 @@ const routes = [
   {
     path: '/advisor/open-request/:id',
     name: 'AdvisorOpenRequestDetail',
-    component: AdvisorOpenRequestDetail
+    component: AdvisorOpenRequestDetail,
+    meta: { requiresAuth: true, role: 'advisor' },
   },
   {
     path: '/advisor/profile',
@@ -105,7 +112,7 @@ const routes = [
     component: AdvisorProfile,
     meta: { requiresAuth: true, role: 'advisor' },
   },
-
+  // เส้นทางสำหรับอาจารย์ประจำวิชา
   {
     path: '/instructor',
     redirect: '/instructor/home',
@@ -129,7 +136,7 @@ const routes = [
     component: InstructorProfile,
     meta: { requiresAuth: true, role: 'instructor' },
   },
-
+  // เส้นทางสำหรับหัวหน้าสาขาวิชา
   {
     path: '/head',
     redirect: '/head/home',
@@ -150,7 +157,8 @@ const routes = [
   {
     path: '/head/open-request/:id',
     name: 'HeadOpenRequestDetail',
-    component: HeadOpenRequestDetail
+    component: HeadOpenRequestDetail,
+    meta: { requiresAuth: true, role: 'head' },
   },
   {
     path: '/head/profile',
@@ -158,7 +166,7 @@ const routes = [
     component: HeadProfile,
     meta: { requiresAuth: true, role: 'head' },
   },
-
+  // เส้นทางสำหรับแอดมิน
   {
     path: '/admin',
     redirect: '/admin/dashboard',
@@ -207,13 +215,13 @@ router.beforeEach((to, from, next) => {
   const user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : {};
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
 
-  // อนุญาตให้เข้าถึงหน้า Landing โดยไม่ต้องล็อกอิน
-  if (to.name === 'LandingPage') {
-    next();
-  } else if (requiresAuth && !isLoggedIn) {
-    next('/');
+  if (requiresAuth && !isLoggedIn) {
+    next('/login'); // ถ้าต้องการการล็อกอินแต่ไม่ได้ล็อกอิน ไปที่หน้า login
   } else if (to.path === '/login' && isLoggedIn) {
-    if (user.role === 'advisor') {
+    // ถ้าล็อกอินแล้วและพยายามเข้าหน้า login นำไปยังหน้าหลักของบทบาท
+    if (user.role === 'student') {
+      next('/home');
+    } else if (user.role === 'advisor') {
       next('/advisor/home');
     } else if (user.role === 'instructor') {
       next('/instructor/home');
@@ -225,7 +233,10 @@ router.beforeEach((to, from, next) => {
       next('/home');
     }
   } else if (requiresAuth && to.meta.role && user.role !== to.meta.role) {
-    if (user.role === 'advisor') {
+    // ถ้าผู้ใช้พยายามเข้าหน้าที่ไม่ตรงกับบทบาท
+    if (user.role === 'student') {
+      next('/home');
+    } else if (user.role === 'advisor') {
       next('/advisor/home');
     } else if (user.role === 'instructor') {
       next('/instructor/home');

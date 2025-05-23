@@ -310,35 +310,35 @@ export default {
       }
     },
     async fetchRequestHistory() {
-      this.isLoading = true;
-      this.errorMessage = '';
-      try {
-        const userData = JSON.parse(localStorage.getItem('user'));
-        if (!userData || !userData._id) {
-          throw new Error('ไม่พบข้อมูลผู้ใช้หรือข้อมูลไม่ครบถ้วน');
-        }
+  this.isLoading = true;
+  this.errorMessage = '';
+  try {
+    const userData = JSON.parse(localStorage.getItem('user'));
+    if (!userData || !userData._id) {
+      throw new Error('ไม่พบข้อมูลผู้ใช้หรือข้อมูลไม่ครบถ้วน');
+    }
 
-        const [generalResponse, openCourseResponse, addSeatResponse] = await Promise.all([
-          axios.get(`/api/generalrequests?userId=${userData._id}`),
-          axios.get(`/api/opencourserequests/opencourserequests?userId=${userData._id}`),
-          axios.get(`/api/addseatrequests/addseatrequests?userId=${userData._id}`),
-        ]);
+    const [generalResponse, openCourseResponse, addSeatResponse] = await Promise.all([
+      axios.get(`/api/generalrequests?userId=${userData._id}`),
+      axios.get(`/api/opencourserequests/opencourserequests?userId=${userData._id}`),
+      axios.get(`/api/addseatrequests/user/${userData._id}`), // Updated endpoint
+    ]);
 
-        this.requestHistory = [
-          ...generalResponse.data.map(req => ({ ...req, requestType: 'general' })),
-          ...openCourseResponse.data
-            .filter(req => req.status !== 'draft')
-            .map(req => ({ ...req, requestType: 'open_course', petitionType: 'open_course' })),
-          ...addSeatResponse.data
-            .filter(req => req.status !== 'draft')
-            .map(req => ({ ...req, requestType: 'add_seat', petitionType: 'add_seat' })),
-        ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      } catch (error) {
-        console.error('Error fetching request history:', error);
-        this.errorMessage = 'เกิดข้อผิดพลาดในการโหลดประวัติคำร้อง กรุณาลองใหม่';
-      } finally {
-        this.isLoading = false;
-      }
+    this.requestHistory = [
+      ...generalResponse.data.map(req => ({ ...req, requestType: 'general' })),
+      ...openCourseResponse.data
+        .filter(req => req.status !== 'draft')
+        .map(req => ({ ...req, requestType: 'open_course', petitionType: 'open_course' })),
+      ...addSeatResponse.data
+        .filter(req => req.status !== 'draft')
+        .map(req => ({ ...req, requestType: 'add_seat', petitionType: 'add_seat' })),
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  } catch (error) {
+    console.error('Error fetching request history:', error);
+    this.errorMessage = 'เกิดข้อผิดพลาดในการโหลดประวัติคำร้อง กรุณาลองใหม่';
+  } finally {
+    this.isLoading = false;
+  }
     },
     getPetitionTypeLabel(request) {
       if (request.requestType === 'open_course') {
