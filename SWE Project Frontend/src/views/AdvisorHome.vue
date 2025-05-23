@@ -1,19 +1,19 @@
 <template>
-    <div class="advisor-home-page">
-      <!-- Header -->
-      <div class="header">
-        <div class="header-content">
-          <img src="@/assets/rmuti-logo.png" alt="RMUTI Logo" class="logo" />
-          <div class="header-text">
-            <h1>หน้าหลัก - อาจารย์ที่ปรึกษา</h1>
-            <p>มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน วิทยาเขตขอนแก่น</p>
-            <p v-if="user">ยินดีต้อนรับ: {{ user.email }}</p>
-          </div>
+  <div class="advisor-home-page">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-content">
+        <img src="@/assets/rmuti-logo.png" alt="RMUTI Logo" class="logo" />
+        <div class="header-text">
+          <h1>หน้าหลัก - อาจารย์ที่ปรึกษา</h1>
+          <p>มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน วิทยาเขตขอนแก่น</p>
+          <p v-if="user">ยินดีต้อนรับ: {{ user.email }}</p>
         </div>
       </div>
-  
-      <!-- Request List -->
-      <div class="request-section">
+    </div>
+
+    <!-- Request List -->
+    <div class="request-section">
       <h2>รายการคำร้องที่ต้องพิจารณา</h2>
       <div class="request-table">
         <table>
@@ -31,14 +31,14 @@
             <tr v-for="request in requests" :key="request._id">
               <td>{{ formatDate(request.createdAt) }}</td>
               <td>{{ request.studentId }}</td>
-              <td>{{ request.fullName }}</td>
+              <td>{{ request.fullName || request.studentName }}</td>
               <td>{{ petitionTypeLabels[request.petitionType] || request.petitionType }}</td>
               <td>
                 <span :class="getStatusClass(request.status)">{{ formatStatus(request.status) }}</span>
               </td>
               <td>
                 <router-link
-                  :to="`/advisor/request/${request._id}`"
+                  :to="request.requestType === 'open_course' ? `/advisor/open-request/${request._id}` : `/advisor/request/${request._id}`"
                   class="view-btn"
                 >
                   ดูรายละเอียด
@@ -52,65 +52,72 @@
         </table>
       </div>
     </div>
-  
-      <!-- Footer -->
-      <footer class="footer-section">
-        <p>© 2025 มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน วิทยาเขตขอนแก่น</p>
-      </footer>
-    </div>
-  </template>
-  
-  <script>
-  export default {
-    name: 'AdvisorHome',
-    data() {
-      return {
-        user: null,
-        requests: [],
-        petitionTypeLabels: {
-          request_leave: 'ขอลา',
-          request_transcript: 'ขอใบระเบียนผลการศึกษา',
-          request_change_course: 'ขอเปลี่ยนแปลงรายวิชา',
-          other: 'อื่นๆ',
-        },
-      };
-    },
-    created() {
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        this.user = JSON.parse(userData);
-        this.fetchRequests();
-      } else {
+
+    <!-- Footer -->
+    <footer class="footer-section">
+      <p>© 2025 มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน วิทยาเขตขอนแก่น</p>
+    </footer>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'AdvisorHome',
+  data() {
+    return {
+      user: null,
+      requests: [],
+      petitionTypeLabels: {
+        request_leave: 'ขอลา',
+        request_transcript: 'ขอใบระเบียนผลการศึกษา',
+        request_change_course: 'ขอเปลี่ยนแปลงรายวิชา',
+        other: 'อื่นๆ',
+        open_course: 'ขอเปิดรายวิชานอกแผนการเรียน'
+      }
+    };
+  },
+  created() {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      this.user = JSON.parse(userData);
+      this.fetchRequests();
+    } else {
+      this.$router.push('/login');
+    }
+  },
+  methods: {
+    async fetchRequests() {
+      try {
+        const [generalResponse, openCourseResponse] = await Promise.all([
+          this.$axios.get('/api/generalrequests/advisor/pending'),
+          this.$axios.get('/api/opencourserequests/advisor/pending')
+        ]);
+        this.requests = [
+          ...generalResponse.data.map(req => ({ ...req, requestType: 'general' })),
+          ...openCourseResponse.data.map(req => ({ ...req, requestType: 'open_course', petitionType: 'open_course' }))
+        ];
+      } catch (error) {
+        console.error('Error fetching requests:', error);
         this.$router.push('/login');
       }
     },
-    methods: {
-      async fetchRequests() {
-        try {
-          const response = await this.$axios.get('/api/generalrequests/advisor/pending');
-          this.requests = response.data;
-        } catch (error) {
-          console.error('Error fetching requests:', error);
-          this.$router.push('/login');
-        }
-      },
-      formatDate(dateString) {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('th-TH', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        });
-      },
-      formatStatus(status) {
-        return status === 'pending_advisor' ? 'รอพิจารณา' : status;
-      },
-      getStatusClass(status) {
-        return status === 'pending_advisor' ? 'status-pending' : '';
-      },
+    formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('th-TH', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
     },
-  };
-  </script>
+    formatStatus(status) {
+      return status === 'pending_advisor' ? 'รอพิจารณา' : status;
+    },
+    getStatusClass(status) {
+      return status === 'pending_advisor' ? 'status-pending' : '';
+    }
+  }
+};
+</script>
   
   <style scoped>
   @keyframes fadeIn {

@@ -21,6 +21,8 @@ import AdminAnnouncements from '../views/AdminAnnouncements.vue';
 import AdminCourses from '../views/AdminCourses.vue';
 import AdminUsers from '../views/AdminUsers.vue';
 import AdminProfile from '../views/AdminProfile.vue';
+import AdvisorOpenRequestDetail from '../views/AdvisorOpenRequestDetail.vue';
+import HeadOpenRequestDetail from '../views/HeadOpenRequestDetail.vue';
 
 const routes = [
   {
@@ -93,6 +95,11 @@ const routes = [
     meta: { requiresAuth: true, role: 'advisor' },
   },
   {
+    path: '/advisor/open-request/:id',
+    name: 'AdvisorOpenRequestDetail',
+    component: AdvisorOpenRequestDetail
+  },
+  {
     path: '/advisor/profile',
     name: 'AdvisorProfile',
     component: AdvisorProfile,
@@ -139,6 +146,11 @@ const routes = [
     name: 'HeadRequestDetail',
     component: HeadRequestDetail,
     meta: { requiresAuth: true, role: 'head' },
+  },
+  {
+    path: '/head/open-request/:id',
+    name: 'HeadOpenRequestDetail',
+    component: HeadOpenRequestDetail
   },
   {
     path: '/head/profile',

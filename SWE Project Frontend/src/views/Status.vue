@@ -68,7 +68,7 @@
             <tbody>
               <tr v-for="request in paginatedRequests" :key="request._id">
                 <td>{{ formatDate(request.createdAt) }}</td>
-                <td>{{ petitionTypeLabels[request.petitionType] || request.petitionType }}</td>
+                <td>{{ getPetitionTypeLabel(request) }}</td>
                 <td>
                   <span :class="getStatusClass(request.status)">{{ formatStatus(request.status) }}</span>
                 </td>
@@ -87,7 +87,7 @@
                   <button
                     v-if="request.status === 'head_approved'"
                     class="download-btn"
-                    @click="downloadPDF(request._id)"
+                    @click="downloadPDF(request._id, request.requestType)"
                   >
                     <i class="fas fa-file-pdf"></i> ดาวน์โหลด PDF
                   </button>
@@ -138,11 +138,11 @@
                 </div>
                 <div class="detail-item">
                   <label><i class="fas fa-file-signature"></i> ประเภทคำร้อง:</label>
-                  <p>{{ petitionTypeLabels[selectedRequest.petitionType] || selectedRequest.petitionType }}</p>
+                  <p>{{ getPetitionTypeLabel(selectedRequest) }}</p>
                 </div>
                 <div class="detail-item">
                   <label><i class="fas fa-comment"></i> รายละเอียด:</label>
-                  <p>{{ selectedRequest.details }}</p>
+                  <p>{{ selectedRequest.details || getRequestDetails(selectedRequest) }}</p>
                 </div>
                 <div class="detail-item">
                   <label><i class="fas fa-info"></i> สถานะ:</label>
@@ -165,7 +165,7 @@
                 <h4><i class="fas fa-user"></i> ข้อมูลนักศึกษา</h4>
                 <div class="detail-item">
                   <label><i class="fas fa-user-circle"></i> ผู้ยื่น:</label>
-                  <p>{{ selectedRequest.fullName }} ({{ selectedRequest.studentId }})</p>
+                  <p>{{ selectedRequest.studentName || selectedRequest.fullName }} ({{ selectedRequest.studentId }})</p>
                 </div>
                 <div class="detail-item">
                   <label><i class="fas fa-university"></i> คณะ:</label>
@@ -176,23 +176,10 @@
                   <p>{{ selectedRequest.fieldOfStudy }}</p>
                 </div>
               </div>
-
-              <!-- Contact Information -->
-              <div class="detail-section">
-                <h4><i class="fas fa-envelope"></i> ข้อมูลติดต่อ</h4>
-                <div class="detail-item">
-                  <label><i class="fas fa-phone"></i> เบอร์โทรศัพท์:</label>
-                  <p>{{ selectedRequest.contactNumber }}</p>
-                </div>
-                <div class="detail-item">
-                  <label><i class="fas fa-at"></i> อีเมล:</label>
-                  <p>{{ selectedRequest.email }}</p>
-                </div>
-              </div>
             </div>
             <div class="modal-footer">
               <button class="modal-close-btn" @click="closeModal">
-                <i class="fas fa-times-circle"></i> ปิด
+                <i class="fas fa-times"></i> ปิด
               </button>
             </div>
           </div>
@@ -202,14 +189,15 @@
         <div v-if="showConfirmModal" class="confirm-modal-overlay" @click="closeConfirmModal">
           <div class="confirm-modal-content" @click.stop>
             <div class="confirm-modal-header">
-              <h3><i class="fas fa-exclamation-circle"></i> ยืนยันการยกเลิก</h3>
+              <h3><i class="fas fa-exclamation-triangle"></i> ยืนยันการยกเลิกคำร้อง</h3>
             </div>
             <div class="confirm-modal-body">
               <p>คุณแน่ใจหรือไม่ว่าต้องการยกเลิกคำร้องนี้?</p>
-              <p class="highlight">{{ petitionTypeLabels[selectedRequest.petitionType] || selectedRequest.petitionType }}</p>
+              <p class="highlight">{{ getPetitionTypeLabel(selectedRequest) }}</p>
+              <p>การยกเลิกนี้ไม่สามารถย้อนกลับได้</p>
             </div>
             <div class="confirm-modal-footer">
-              <button class="confirm-btn" @click="confirmCancel">
+              <button class="confirm-btn" @click="cancelRequest">
                 <i class="fas fa-check"></i> ยืนยัน
               </button>
               <button class="cancel-btn" @click="closeConfirmModal">
@@ -224,21 +212,25 @@
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   name: 'StatusPage',
   data() {
     return {
+      user: null,
       requests: [],
+      filteredRequests: [],
+      paginatedRequests: [],
       searchQuery: '',
       statusFilter: '',
-      filteredRequests: [],
       currentPage: 1,
-      itemsPerPage: 5,
+      itemsPerPage: 10,
       isLoading: false,
       errorMessage: '',
       showModal: false,
-      showConfirmModal: false,
       selectedRequest: null,
+      showConfirmModal: false,
       showNotification: false,
       notificationMessage: '',
       notificationType: 'success',
@@ -248,58 +240,92 @@ export default {
         request_transcript: 'ขอใบระเบียนผลการศึกษา',
         request_change_course: 'ขอเปลี่ยนแปลงรายวิชา',
         other: 'อื่นๆ',
-      },
+        open_course: 'ขอเปิดรายวิชานอกแผนการเรียน'
+      }
     };
   },
   computed: {
     totalPages() {
       return Math.ceil(this.filteredRequests.length / this.itemsPerPage);
-    },
-    paginatedRequests() {
-      const start = (this.currentPage - 1) * this.itemsPerPage;
-      const end = start + this.itemsPerPage;
-      return this.filteredRequests.slice(start, end);
-    },
+    }
   },
   created() {
-    this.fetchRequests();
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      this.user = JSON.parse(userData);
+      this.fetchRequests();
+    } else {
+      this.$router.push('/login');
+    }
+  },
+  watch: {
+    currentPage() {
+      this.updatePaginatedRequests();
+    }
   },
   methods: {
-    async fetchRequests() {
-      this.isLoading = true;
-      try {
-        const response = await this.$axios.get('/api/generalrequests');
-        this.requests = response.data;
-        this.filterRequests();
-      } catch (error) {
-        this.errorMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการดึงข้อมูลคำร้อง';
-        this.showNotification = true;
-        this.notificationMessage = this.errorMessage;
-        this.notificationType = 'error';
-        this.notificationIcon = 'fas fa-exclamation-circle';
-      } finally {
-        this.isLoading = false;
-      }
-    },
+async fetchRequests() {
+  this.isLoading = true;
+  try {
+    const [generalResponse, openCourseResponse] = await Promise.all([
+      axios.get(`/api/generalrequests?userId=${this.user._id}`), // แก้ไข endpoint
+      axios.get(`/api/opencourserequests/opencourserequests?userId=${this.user._id}`)
+    ]);
+
+    this.requests = [
+      ...generalResponse.data.map(req => ({ ...req, requestType: 'general' })),
+      ...openCourseResponse.data
+        .filter(req => req.status !== 'draft')
+        .map(req => ({ ...req, requestType: 'open_course', petitionType: 'open_course' }))
+    ];
+    this.filterRequests();
+  } catch (error) {
+    console.error('Error fetching requests:', error);
+    this.errorMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูลคำร้อง';
+  } finally {
+    this.isLoading = false;
+  }
+},
     filterRequests() {
-      this.filteredRequests = this.requests.filter(request => {
-        const matchesSearch = this.searchQuery
-          ? (this.petitionTypeLabels[request.petitionType] || request.petitionType)
-              .toLowerCase()
-              .includes(this.searchQuery.toLowerCase())
-          : true;
-        const matchesStatus = this.statusFilter
-          ? request.status === this.statusFilter
-          : true;
-        return matchesSearch && matchesStatus;
-      });
+      let filtered = this.requests;
+
+      if (this.searchQuery) {
+        const query = this.searchQuery.toLowerCase();
+        filtered = filtered.filter(request =>
+          this.getPetitionTypeLabel(request).toLowerCase().includes(query)
+        );
+      }
+
+      if (this.statusFilter) {
+        filtered = filtered.filter(request => request.status === this.statusFilter);
+      }
+
+      this.filteredRequests = filtered;
       this.currentPage = 1;
+      this.updatePaginatedRequests();
     },
-    formatDate(date) {
-      return new Date(date).toLocaleDateString('th-TH', {
-        year: 'numeric',
-        month: '2-digit',
+    updatePaginatedRequests() {
+      const start = (this.currentPage - 1) * this.itemsPerPage;
+      const end = start + this.itemsPerPage;
+      this.paginatedRequests = this.filteredRequests.slice(start, end);
+    },
+    getPetitionTypeLabel(request) {
+      if (request.requestType === 'open_course') {
+        return this.petitionTypeLabels['open_course'];
+      }
+      return this.petitionTypeLabels[request.petitionType] || request.petitionType;
+    },
+    getRequestDetails(request) {
+      if (request.requestType === 'open_course') {
+        return `รหัสวิชา: ${request.courseCode}, ชื่อวิชา: ${request.courseTitle}, เหตุผล: ${request.reason}`;
+      }
+      return request.details;
+    },
+    formatDate(dateString) {
+      return new Date(dateString).toLocaleDateString('th-TH', {
         day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
       });
     },
     formatStatus(status) {
@@ -309,7 +335,7 @@ export default {
         advisor_rejected: 'ปฏิเสธโดยอาจารย์ที่ปรึกษา',
         pending_head: 'รอพิจารณาโดยหัวหน้าสาขา',
         head_approved: 'อนุมัติโดยหัวหน้าสาขา',
-        head_rejected: 'ปฏิเสธโดยหัวหน้าสาขา',
+        head_rejected: 'ปฏิเสธโดยหัวหน้าสาขา'
       };
       return statusLabels[status] || status;
     },
@@ -320,7 +346,7 @@ export default {
         advisor_rejected: 'status-rejected',
         pending_head: 'status-pending',
         head_approved: 'status-approved',
-        head_rejected: 'status-rejected',
+        head_rejected: 'status-rejected'
       };
       return statusClasses[status] || '';
     },
@@ -328,20 +354,30 @@ export default {
       this.selectedRequest = request;
       this.showModal = true;
     },
+    closeModal() {
+      this.showModal = false;
+      this.selectedRequest = null;
+    },
     openConfirmModal(request) {
       this.selectedRequest = request;
       this.showConfirmModal = true;
     },
-    async confirmCancel() {
+    closeConfirmModal() {
+      this.showConfirmModal = false;
+      this.selectedRequest = null;
+    },
+    async cancelRequest() {
       try {
-        await this.$axios.delete(`/api/generalrequests/${this.selectedRequest._id}/cancel`);
+        const endpoint = this.selectedRequest.requestType === 'open_course'
+          ? `/api/opencourserequests/${this.selectedRequest._id}/reject`
+          : `/api/generalrequests/${this.selectedRequest._id}/reject`;
+        await axios.post(endpoint, { comment: 'ยกเลิกโดยนักศึกษา' });
         this.showNotification = true;
-        this.notificationMessage = 'ยกเลิกคำร้องสำเร็จ';
+        this.notificationMessage = 'ยกเลิกคำร้องเรียบร้อยแล้ว';
         this.notificationType = 'success';
         this.notificationIcon = 'fas fa-check-circle';
-        this.requests = this.requests.filter(r => r._id !== this.selectedRequest._id);
-        this.filterRequests();
         this.closeConfirmModal();
+        await this.fetchRequests();
       } catch (error) {
         this.showNotification = true;
         this.notificationMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการยกเลิกคำร้อง';
@@ -349,43 +385,38 @@ export default {
         this.notificationIcon = 'fas fa-exclamation-circle';
       }
     },
-    closeModal() {
-      this.showModal = false;
-      this.selectedRequest = null;
-    },
-    closeConfirmModal() {
-      this.showConfirmModal = false;
-      this.selectedRequest = null;
-    },
-    closeNotification() {
-      this.showNotification = false;
-      this.notificationMessage = '';
-    },
-    async downloadPDF(requestId) {
+    async downloadPDF(requestId, requestType) {
+      const endpoint = requestType === 'open_course'
+        ? `/api/opencourserequests/${requestId}/pdf`
+        : `/api/generalrequests/${requestId}/pdf`;
       try {
-        const response = await this.$axios.get(`/api/generalrequests/${requestId}/pdf`, {
-          responseType: 'blob',
-        });
+        const response = await axios.get(endpoint, { responseType: 'blob' });
+        const fileName = requestType === 'open_course' ? `RE07_${requestId}.pdf` : `GeneralRequest_${requestId}.pdf`;
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `general_request_${requestId}.pdf`);
+        link.setAttribute('download', fileName);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-        this.showNotification = true;
-        this.notificationMessage = 'ดาวน์โหลด PDF สำเร็จ';
-        this.notificationType = 'success';
-        this.notificationIcon = 'fas fa-check-circle';
       } catch (error) {
+        console.error('Error downloading PDF:', {
+          endpoint,
+          status: error.response?.status,
+          message: error.response?.data?.message || error.message,
+        });
         this.showNotification = true;
         this.notificationMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการดาวน์โหลด PDF';
         this.notificationType = 'error';
         this.notificationIcon = 'fas fa-exclamation-circle';
       }
     },
-  },
+    closeNotification() {
+      this.showNotification = false;
+      this.notificationMessage = '';
+    }
+  }
 };
 </script>
 

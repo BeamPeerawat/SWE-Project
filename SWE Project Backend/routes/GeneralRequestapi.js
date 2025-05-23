@@ -350,8 +350,8 @@ router.get('/:id/pdf', ensureAuthenticatedAndRole(['student']), async (req, res)
       color: rgb(0, 0, 0),
     });
     page.drawText(fullNameText, {
-      x: 188.94,
-      y: 664.94,
+      x: 100,
+      y: 560,
       size: 14,
       font: thaiFont,
       color: rgb(0, 0, 0),
