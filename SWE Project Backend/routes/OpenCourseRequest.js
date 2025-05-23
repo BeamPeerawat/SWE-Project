@@ -290,7 +290,7 @@ router.get('/:id/pdf', async (req, res) => {
       const day = date.getDate().toString().padStart(2, '0');
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
       const year = date.getFullYear() + 543; // Convert to Thai Buddhist year
-      return ${day}/${month}/${year};
+      return `${day}/${month}/${year}`;
     };
 
     // Fill in the form fields using x,y coordinates
@@ -357,7 +357,7 @@ router.get('/:id/pdf', async (req, res) => {
     const pdfBytesModified = await pdfDoc.save();
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': attachment; filename=RE07_${id}.pdf
+      'Content-Disposition': `attachment; filename=RE07_${id}.pdf`
     });
     res.send(Buffer.from(pdfBytesModified));
   } catch (error) {
@@ -365,5 +365,6 @@ router.get('/:id/pdf', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 
 module.exports = router;

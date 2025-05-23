@@ -54,7 +54,6 @@
               type="text"
               v-model="editUser.faculty"
               placeholder="คณะ"
-              required
             />
           </div>
           <div class="info-item">
@@ -65,12 +64,17 @@
               type="text"
               v-model="editUser.branch"
               placeholder="สาขาวิชา"
-              required
             />
           </div>
           <div class="info-item">
-            <label>ชั้นปี:</label>
-            <p>{{ user.group || 'ยังไม่ได้ระบุ' }}</p>
+            <label>กลุ่มเรียน:</label>
+            <p v-if="!isEditing">{{ user.group || 'ยังไม่ได้ระบุ' }}</p>
+            <input
+              v-else
+              type="text"
+              v-model="editUser.group"
+              placeholder="กลุ่มเรียน"
+            />
           </div>
           <div class="info-item">
             <label>อีเมล:</label>
@@ -80,30 +84,22 @@
               type="email"
               v-model="editUser.email"
               placeholder="อีเมล"
-              disabled
+              required
             />
           </div>
           <div class="info-item">
             <label>เบอร์โทรศัพท์:</label>
             <p v-if="!isEditing">{{ user.contactNumber || 'ยังไม่ได้ระบุ' }}</p>
-            <div v-else>
-              <input
-                type="tel"
-                v-model="editUser.contactNumber"
-                placeholder="เบอร์โทรศัพท์"
-                maxlength="10"
-                inputmode="numeric"
-                pattern="[0-9]{10}"
-                @input="restrictToNumbers"
-                required
-              />
-              <span
-                v-if="editUser.contactNumber && editUser.contactNumber.length !== 10"
-                class="error-message"
-              >
-                กรุณากรอกเบอร์โทรศัพท์ 10 หลัก
-              </span>
-            </div>
+            <input
+              v-else
+              type="text"
+              v-model="editUser.contactNumber"
+              placeholder="เบอร์โทรศัพท์"
+              @input="restrictToNumbers"
+            />
+            <span v-if="isEditing && editUser.contactNumber && editUser.contactNumber.length !== 10" class="error-message">
+              กรุณากรอกเบอร์โทรศัพท์ 10 หลัก
+            </span>
           </div>
         </div>
         <div class="action-buttons">
@@ -128,34 +124,27 @@
         <div v-else-if="errorMessage" class="error-message">
           {{ errorMessage }}
         </div>
-        <div class="history-table">
+        <div v-else class="history-table">
           <table>
             <thead>
               <tr>
                 <th>วันที่ยื่น</th>
                 <th>ประเภทคำร้อง</th>
-                <th>รายละเอียด</th>
                 <th>สถานะ</th>
+                <th>หมายเหตุ</th>
                 <th>การดำเนินการ</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="request in requestHistory" :key="request._id">
                 <td>{{ formatDate(request.createdAt) }}</td>
-                <td>{{ request.requestType }}</td>
-                <td>
-                  <span v-if="request.requestType === 'คำร้องทั่วไป'">
-                    {{ request.courseTitle }}
-                  </span>
-                  <span v-else>
-                    {{ `${request.courseCode} - ${request.courseTitle}` }}
-                  </span>
-                </td>
+                <td>{{ getPetitionTypeLabel(request) }}</td>
                 <td>
                   <span :class="getStatusClass(request.status)">{{
                     formatStatus(request.status)
                   }}</span>
                 </td>
+                <td>{{ request.advisorComment || request.headComment || '-' }}</td>
                 <td>
                   <button class="view-btn" @click="viewRequest(request)">
                     ดูรายละเอียด
@@ -170,7 +159,7 @@
         </div>
       </div>
 
-      <!-- โมดัลรายละเอียดคำร้อง -->
+      <!-- Request Details Modal -->
       <div v-if="showModal" class="modal-overlay" @click="closeModal">
         <div class="modal-content" @click.stop>
           <div class="modal-header">
@@ -180,7 +169,7 @@
             </button>
           </div>
           <div class="modal-body">
-            <!-- ข้อมูลคำร้อง -->
+            <!-- Request Information -->
             <div class="detail-section">
               <h4><i class="fas fa-info-circle"></i> ข้อมูลคำร้อง</h4>
               <div class="detail-item">
@@ -189,23 +178,11 @@
               </div>
               <div class="detail-item">
                 <label><i class="fas fa-file-signature"></i> ประเภทคำร้อง:</label>
-                <p>{{ selectedRequest.requestType }}</p>
-              </div>
-              <div class="detail-item" v-if="selectedRequest.requestType !== 'คำร้องทั่วไป'">
-                <label><i class="fas fa-book"></i> รายวิชา:</label>
-                <p class="highlight">{{ `${selectedRequest.courseCode} - ${selectedRequest.courseTitle}` }}</p>
-              </div>
-              <div class="detail-item" v-else>
-                <label><i class="fas fa-file"></i> ประเภทคำร้องทั่วไป:</label>
-                <p class="highlight">{{ selectedRequest.courseTitle }}</p>
-              </div>
-              <div class="detail-item" v-if="selectedRequest.requestType !== 'คำร้องทั่วไป'">
-                <label><i class="fas fa-graduation-cap"></i> หน่วยกิต:</label>
-                <p>{{ selectedRequest.credits }}</p>
+                <p>{{ getPetitionTypeLabel(selectedRequest) }}</p>
               </div>
               <div class="detail-item">
-                <label><i class="fas fa-comment"></i> รายละเอียด/เหตุผล:</label>
-                <p>{{ selectedRequest.reason }}</p>
+                <label><i class="fas fa-comment"></i> รายละเอียด:</label>
+                <p>{{ selectedRequest.details || getRequestDetails(selectedRequest) }}</p>
               </div>
               <div class="detail-item">
                 <label><i class="fas fa-info"></i> สถานะ:</label>
@@ -213,14 +190,22 @@
                   {{ formatStatus(selectedRequest.status) }}
                 </p>
               </div>
+              <div class="detail-item" v-if="selectedRequest.advisorComment">
+                <label><i class="fas fa-comment-alt"></i> หมายเหตุจากอาจารย์ที่ปรึกษา:</label>
+                <p>{{ selectedRequest.advisorComment }}</p>
+              </div>
+              <div class="detail-item" v-if="selectedRequest.headComment">
+                <label><i class="fas fa-comment-alt"></i> หมายเหตุจากหัวหน้าสาขา:</label>
+                <p>{{ selectedRequest.headComment }}</p>
+              </div>
             </div>
 
-            <!-- ข้อมูลนักศึกษา -->
+            <!-- Student Information -->
             <div class="detail-section">
               <h4><i class="fas fa-user"></i> ข้อมูลนักศึกษา</h4>
               <div class="detail-item">
                 <label><i class="fas fa-user-circle"></i> ผู้ยื่น:</label>
-                <p>{{ selectedRequest.studentName }} ({{ selectedRequest.studentId }})</p>
+                <p>{{ selectedRequest.studentName || selectedRequest.fullName }} ({{ selectedRequest.studentId }})</p>
               </div>
               <div class="detail-item">
                 <label><i class="fas fa-university"></i> คณะ:</label>
@@ -228,33 +213,13 @@
               </div>
               <div class="detail-item">
                 <label><i class="fas fa-graduation-cap"></i> สาขาวิชา:</label>
-                <p>{{ selectedRequest.fieldOfStudy }}</p>
-              </div>
-              <div class="detail-item">
-                <label><i class="fas fa-layer-group"></i> ระดับการศึกษา:</label>
-                <p>{{ selectedRequest.levelOfStudy.join(', ') }}</p>
-              </div>
-            </div>
-
-            <!-- ข้อมูลติดต่อ -->
-            <div class="detail-section">
-              <h4><i class="fas fa-envelope"></i> ข้อมูลติดต่อ</h4>
-              <div class="detail-item">
-                <label><i class="fas fa-phone"></i> เบอร์โทรศัพท์:</label>
-                <p>{{ selectedRequest.contactNumber }}</p>
-              </div>
-              <div class="detail-item">
-                <label><i class="fas fa-at"></i> อีเมล:</label>
-                <p>{{ selectedRequest.email }}</p>
+                <p>{{ selectedRequest.fieldOfStudy || selectedRequest.branch }}</p>
               </div>
             </div>
           </div>
           <div class="modal-footer">
             <button class="modal-close-btn" @click="closeModal">
-              <i class="fas fa-times-circle"></i> ปิด
-            </button>
-            <button class="modal-close-btn2" @click="cancelRequest">
-              <i class="fas fa-times-circle"></i> ยกเลิกคำร้อง
+              <i class="fas fa-times"></i> ปิด
             </button>
           </div>
         </div>
@@ -268,32 +233,13 @@
           <i class="fas fa-times"></i>
         </button>
       </div>
-
-      <!-- Confirm Cancel Modal -->
-      <div v-if="showConfirmModal" class="confirm-modal-overlay" @click="closeConfirmModal">
-        <div class="confirm-modal-content" @click.stop>
-          <div class="confirm-modal-header">
-            <h3><i class="fas fa-exclamation-circle"></i> ยืนยันการยกเลิก</h3>
-          </div>
-          <div class="confirm-modal-body">
-            <p>คุณแน่ใจหรือไม่ว่าต้องการยกเลิกคำร้องนี้?</p>
-            <p class="highlight">{{ `${selectedRequest.courseCode} - ${selectedRequest.courseTitle}` }}</p>
-          </div>
-          <div class="confirm-modal-footer">
-            <button class="confirm-btn" @click="confirmCancel">
-              <i class="fas fa-check"></i> ยืนยัน
-            </button>
-            <button class="cancel-btn" @click="closeConfirmModal">
-              <i class="fas fa-times"></i> ยกเลิก
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   name: 'ProfilePage',
   data() {
@@ -304,7 +250,6 @@ export default {
       errorMessage: '',
       errorMessageUser: '',
       showModal: false,
-      showConfirmModal: false,
       selectedRequest: null,
       showNotification: false,
       notificationMessage: '',
@@ -324,10 +269,19 @@ export default {
         student_no: '',
         faculty: '',
         branch: '',
+        group: '',
         email: '',
         contactNumber: '',
       },
       requestHistory: [],
+      petitionTypeLabels: {
+        request_leave: 'ขอลา',
+        request_transcript: 'ขอใบระเบียนผลการศึกษา',
+        request_change_course: 'ขอเปลี่ยนแปลงรายวิชา',
+        other: 'อื่นๆ',
+        open_course: 'ขอเปิดรายวิชานอกแผนการเรียน',
+        add_seat: 'ขอเพิ่มที่นั่ง',
+      },
     };
   },
   async mounted() {
@@ -356,81 +310,106 @@ export default {
       }
     },
     async fetchRequestHistory() {
-  this.isLoading = true;
-  this.errorMessage = '';
-  try {
-    const userData = JSON.parse(localStorage.getItem('user'));
-    if (!userData || !userData.email || !userData._id) {
-      throw new Error('ไม่พบข้อมูลผู้ใช้หรือข้อมูลไม่ครบถ้วน');
-    }
+      this.isLoading = true;
+      this.errorMessage = '';
+      try {
+        const userData = JSON.parse(localStorage.getItem('user'));
+        if (!userData || !userData._id) {
+          throw new Error('ไม่พบข้อมูลผู้ใช้หรือข้อมูลไม่ครบถ้วน');
+        }
 
-    const [openCourseResponse, addSeatResponse, generalRequestResponse] = await Promise.all([
-      this.$axios.get(`/api/opencourserequests?email=${userData.email}`),
-      this.$axios.get(`/api/addseatrequests?email=${userData.email}`),
-      this.$axios.get(`/api/generalrequests`), // ดึงคำร้องทั่วไป
-    ]);
+        const [generalResponse, openCourseResponse, addSeatResponse] = await Promise.all([
+          axios.get(`/api/generalrequests?userId=${userData._id}`),
+          axios.get(`/api/opencourserequests/opencourserequests?userId=${userData._id}`),
+          axios.get(`/api/addseatrequests/addseatrequests?userId=${userData._id}`),
+        ]);
 
-    const openCourseRequests = openCourseResponse.data.map(request => ({
-      ...request,
-      requestType: 'คำร้องขอเปิดรายวิชานอกแผน',
-    }));
-
-    const addSeatRequests = addSeatResponse.data.map(request => ({
-      ...request,
-      requestType: 'คำร้องขอเพิ่มที่นั่ง',
-    }));
-
-    const generalRequests = generalRequestResponse.data.map(request => ({
-      ...request,
-      requestType: 'คำร้องทั่วไป',
-      courseCode: '', // คำร้องทั่วไปไม่มีรหัสวิชา
-      courseTitle: this.getPetitionTypeLabel(request.petitionType), // ใช้ประเภทคำร้องเป็นชื่อวิชา
-    }));
-
-    this.requestHistory = [...openCourseRequests, ...addSeatRequests, ...generalRequests]
-      .filter(request => request.email === userData.email)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  } catch (error) {
-    console.error('เกิดข้อผิดพลาดในการดึงข้อมูล:', error);
-    this.errorMessage = 'เกิดข้อผิดพลาดในการโหลดประวัติคำร้อง กรุณาลองใหม่';
-  } finally {
-    this.isLoading = false;
-  }
-},
-
-getPetitionTypeLabel(petitionType) {
-  const petitionTypeLabels = {
-    request_leave: 'ขอลา',
-    request_transcript: 'ขอใบระเบียนผลการศึกษา',
-    request_change_course: 'ขอเปลี่ยนแปลงรายวิชา',
-    other: 'อื่นๆ',
-  };
-  return petitionTypeLabels[petitionType] || petitionType;
-},
+        this.requestHistory = [
+          ...generalResponse.data.map(req => ({ ...req, requestType: 'general' })),
+          ...openCourseResponse.data
+            .filter(req => req.status !== 'draft')
+            .map(req => ({ ...req, requestType: 'open_course', petitionType: 'open_course' })),
+          ...addSeatResponse.data
+            .filter(req => req.status !== 'draft')
+            .map(req => ({ ...req, requestType: 'add_seat', petitionType: 'add_seat' })),
+        ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      } catch (error) {
+        console.error('Error fetching request history:', error);
+        this.errorMessage = 'เกิดข้อผิดพลาดในการโหลดประวัติคำร้อง กรุณาลองใหม่';
+      } finally {
+        this.isLoading = false;
+      }
+    },
+    getPetitionTypeLabel(request) {
+      if (request.requestType === 'open_course') {
+        return this.petitionTypeLabels['open_course'];
+      } else if (request.requestType === 'add_seat') {
+        return this.petitionTypeLabels['add_seat'];
+      }
+      return this.petitionTypeLabels[request.petitionType] || request.petitionType;
+    },
+    getRequestDetails(request) {
+      if (request.requestType === 'open_course') {
+        return `รหัสวิชา: ${request.courseCode}, ชื่อวิชา: ${request.courseTitle}, เหตุผล: ${request.reason}`;
+      } else if (request.requestType === 'add_seat') {
+        return `รหัสวิชา: ${request.courseCode}, ชื่อวิชา: ${request.courseTitle}, ตอนเรียน: ${request.section}`;
+      }
+      return request.details;
+    },
     formatDate(dateString) {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('th-TH', {
+      return new Date(dateString).toLocaleDateString('th-TH', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
       });
     },
     formatStatus(status) {
-      return status === 'draft' ? 'ร่าง' : 'รอพิจารณา';
+      const statusLabels = {
+        pending_advisor: 'รอพิจารณาโดยอาจารย์ที่ปรึกษา',
+        advisor_approved: 'อนุมัติโดยอาจารย์ที่ปรึกษา',
+        advisor_rejected: 'ปฏิเสธโดยอาจารย์ที่ปรึกษา',
+        pending_head: 'รอพิจารณาโดยหัวหน้าสาขา',
+        head_approved: 'อนุมัติโดยหัวหน้าสาขา',
+        head_rejected: 'ปฏิเสธโดยหัวหน้าสาขา',
+        submitted: 'รอยื่นยันโดยอาจารย์ประจำวิชา',
+        instructor_approved: 'อนุมัติโดยอาจารย์ประจำวิชา',
+        instructor_rejected: 'ปฏิเสธโดยอาจารย์ประจำวิชา',
+      };
+      return statusLabels[status] || status;
+    },
+    getStatusClass(status) {
+      const statusClasses = {
+        pending_advisor: 'status-pending',
+        advisor_approved: 'status-approved',
+        advisor_rejected: 'status-rejected',
+        pending_head: 'status-pending',
+        head_approved: 'status-approved',
+        head_rejected: 'status-rejected',
+        submitted: 'status-pending',
+        instructor_approved: 'status-approved',
+        instructor_rejected: 'status-rejected',
+      };
+      return statusClasses[status] || '';
+    },
+    viewRequest(request) {
+      this.selectedRequest = {
+        ...request,
+        studentName: request.studentName || request.fullName,
+        studentId: request.studentId || request.student_no,
+        faculty: request.faculty,
+        fieldOfStudy: request.fieldOfStudy || request.branch,
+      };
+      this.showModal = true;
+    },
+    closeModal() {
+      this.showModal = false;
+      this.selectedRequest = null;
     },
     editProfile() {
-      this.editUser = {
-        name: this.user.name,
-        student_no: this.user.student_no,
-        faculty: this.user.faculty,
-        branch: this.user.branch,
-        email: this.user.email,
-        contactNumber: this.user.contactNumber,
-      };
+      this.editUser = { ...this.user };
       this.isEditing = true;
     },
     async saveProfile() {
-      // Validate contact number
       if (this.editUser.contactNumber && this.editUser.contactNumber.length !== 10) {
         this.showNotification = true;
         this.notificationMessage = 'กรุณากรอกเบอร์โทรศัพท์ 10 หลัก';
@@ -442,21 +421,18 @@ getPetitionTypeLabel(petitionType) {
         return;
       }
       try {
-        // Prepare update payload (exclude group)
         const updateData = {
           name: this.editUser.name,
           student_no: this.editUser.student_no,
           faculty: this.editUser.faculty,
           branch: this.editUser.branch,
+          group: this.editUser.group,
           contactNumber: this.editUser.contactNumber || '',
         };
-        // Send update to backend
         const response = await this.$axios.put(`/api/user/${this.user.email}`, updateData);
-        // Update local user data
         this.user = response.data;
         localStorage.setItem('user', JSON.stringify(this.user));
         this.isEditing = false;
-        // Show success notification
         this.showNotification = true;
         this.notificationMessage = 'บันทึกข้อมูลเรียบร้อยแล้ว!';
         this.notificationType = 'success';
@@ -482,6 +458,7 @@ getPetitionTypeLabel(petitionType) {
         student_no: '',
         faculty: '',
         branch: '',
+        group: '',
         email: '',
         contactNumber: '',
       };
@@ -489,83 +466,16 @@ getPetitionTypeLabel(petitionType) {
     restrictToNumbers(event) {
       this.editUser.contactNumber = event.target.value.replace(/[^0-9]/g, '');
     },
-    viewRequest(request) {
-  this.selectedRequest = {
-    ...request,
-    // ตรวจสอบให้แน่ใจว่าฟิลด์ครบสำหรับคำร้องทั่วไป
-    studentName: request.fullName || request.studentName,
-    studentId: request.studentId || request.student_no,
-    faculty: request.faculty,
-    fieldOfStudy: request.fieldOfStudy || request.branch,
-    contactNumber: request.contactNumber,
-    email: request.email,
-    levelOfStudy: request.levelOfStudy || ['ไม่ระบุ'], // ค่าเริ่มต้นสำหรับคำร้องทั่วไป
-    reason: request.details || request.reason || 'ไม่ระบุ',
-    credits: request.credits || 'N/A', // คำร้องทั่วไปไม่มีหน่วยกิต
-  };
-  this.showModal = true;
-},
-    closeModal() {
-      this.showModal = false;
-      this.selectedRequest = null;
-    },
-    getStatusClass(status) {
-      if (status === 'draft') return 'status-draft';
-      return 'status-pending';
-    },
-    cancelRequest() {
-      this.showConfirmModal = true;
-    },
-    closeConfirmModal() {
-      this.showConfirmModal = false;
-    },
-    async confirmCancel() {
-  try {
-    if (!this.selectedRequest || !this.selectedRequest._id) {
-      throw new Error('ไม่พบข้อมูลคำร้องที่เลือก');
-    }
-    let endpoint;
-    if (this.selectedRequest.requestType === 'คำร้องขอเปิดรายวิชานอกแผน') {
-      endpoint = `/api/opencourserequests/${this.selectedRequest._id}`;
-    } else if (this.selectedRequest.requestType === 'คำร้องขอเพิ่มที่นั่ง') {
-      endpoint = `/api/addseatrequests/${this.selectedRequest._id}`;
-    } else if (this.selectedRequest.requestType === 'คำร้องทั่วไป') {
-      endpoint = `/api/generalrequests/${this.selectedRequest._id}/cancel`;
-    }
-    await this.$axios.delete(endpoint);
-    this.showNotification = true;
-    this.notificationMessage = 'ยกเลิกคำร้องสำเร็จ';
-    this.notificationType = 'success';
-    this.notificationIcon = 'fas fa-check-circle';
-    this.requestHistory = this.requestHistory.filter(
-      request => request._id !== this.selectedRequest._id
-    );
-    this.closeConfirmModal();
-    this.closeModal();
-    setTimeout(() => {
-      this.closeNotification();
-    }, 5000);
-  } catch (error) {
-    console.error('เกิดข้อผิดพลาดในการยกเลิกคำร้อง:', error);
-    this.showNotification = true;
-    this.notificationMessage = 'ไม่สามารถยกเลิกคำร้องได้ กรุณาลองใหม่';
-    this.notificationType = 'error';
-    this.notificationIcon = 'fas fa-exclamation-circle';
-    this.closeConfirmModal();
-    setTimeout(() => {
-      this.closeNotification();
-    }, 5000);
-  }
-},
     closeNotification() {
       this.showNotification = false;
+      this.notificationMessage = '';
     },
   },
 };
 </script>
 
 <style scoped>
-/* Animations */
+/* CSS รวมทั้งส่วนประวัติส่วนตัวและประวัติการยื่นคำร้อง */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -574,15 +484,6 @@ getPetitionTypeLabel(petitionType) {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes scaleUp {
-  from {
-    transform: scale(1);
-  }
-  to {
-    transform: scale(1.05);
   }
 }
 
@@ -599,17 +500,17 @@ getPetitionTypeLabel(petitionType) {
   0% {
     transform: scale(0.85);
     opacity: 0;
-    box-shadow: 0 0 0 rgba(37, 99, 235, 0);
+    box-shadow: 0 0 0 rgba(26, 115, 232, 0);
   }
   60% {
     transform: scale(1.03);
     opacity: 1;
-    box-shadow: 0 0 20px rgba(37, 99, 235, 0.3);
+    box-shadow: 0 0 20px rgba(26, 115, 232, 0.3);
   }
   100% {
     transform: scale(1);
     opacity: 1;
-    box-shadow: 0 0 15px rgba(37, 99, 235, 0.2);
+    box-shadow: 0 0 15px rgba(26, 115, 232, 0.2);
   }
 }
 
@@ -624,16 +525,36 @@ getPetitionTypeLabel(petitionType) {
   }
 }
 
-/* General Page Styling */
-.profile-page {
-  min-height: 100vh;
-  background: #f9fafb;
-  font-family: 'Kanit', sans-serif;
-  padding: 20px;
-  color: #1f2937;
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-/* Header Styling */
+@keyframes progress {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 0%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+.profile-page {
+  min-height: 100vh;
+  background: #f5f7fa;
+  font-family: 'Kanit', sans-serif;
+  padding: 20px;
+}
+
 .profile-header {
   display: flex;
   justify-content: space-between;
@@ -751,48 +672,14 @@ getPetitionTypeLabel(petitionType) {
   transform: translateX(-5px);
 }
 
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes progress {
-  0% {
-    background-position: 0% 0%;
-  }
-  50% {
-    background-position: 100% 0%;
-  }
-  100% {
-    background-position: 0% 0%;
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* Profile Container Styling */
 .profile-container {
-  background: #ffffff;
+  background: white;
   padding: 30px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   animation: fadeIn 1s ease-out;
 }
 
-/* User Info Section Styling */
 .profile-section {
   margin-bottom: 30px;
   padding: 20px;
@@ -841,8 +728,7 @@ getPetitionTypeLabel(petitionType) {
   line-height: 1.5;
 }
 
-.info-item input,
-.info-item select {
+.info-item input {
   width: 100%;
   padding: 10px;
   border: 1px solid #d1d5db;
@@ -853,8 +739,7 @@ getPetitionTypeLabel(petitionType) {
   transition: border-color 0.3s, box-shadow 0.3s;
 }
 
-.info-item input:focus,
-.info-item select:focus {
+.info-item input:focus {
   border-color: #2563eb;
   box-shadow: 0 0 8px rgba(37, 99, 235, 0.2);
   outline: none;
@@ -923,7 +808,6 @@ getPetitionTypeLabel(petitionType) {
   box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
 }
 
-/* Request History Section Styling */
 .history-table {
   width: 100%;
   overflow-x: auto;
@@ -931,10 +815,10 @@ getPetitionTypeLabel(petitionType) {
 
 .loading {
   text-align: center;
-  color: #2563eb;
   font-size: 1rem;
   font-weight: 400;
-  margin: 20px 0;
+  color: #1a73e8;
+  padding: 20px;
 }
 
 table {
@@ -945,40 +829,54 @@ table {
 
 th,
 td {
-  border: 1px solid #d1d5db;
-  padding: 12px;
+  border: 1px solid #ddd;
+  padding: 15px;
   text-align: center;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 th {
-  background: #2563eb;
-  color: #ffffff;
+  background: #1a73e8;
+  color: white;
   font-weight: 500;
-  font-size: 1rem;
 }
 
 td {
-  color: #1f2937;
-  font-size: 1rem;
-  font-weight: 400;
+  background: white;
+  color: #333;
 }
 
-.status-draft {
-  color: #6b7280;
-  font-weight: 500;
+tbody tr {
+  transition: background 0.3s;
+}
+
+tbody tr:hover {
+  background: #f9f9f9;
 }
 
 .status-pending {
-  color: #f97316;
+  color: #f39c12;
+  font-weight: 500;
+}
+
+.status-approved {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.status-rejected {
+  color: #ef4444;
   font-weight: 500;
 }
 
 .view-btn {
   padding: 8px 15px;
-  background: #2563eb;
-  color: #ffffff;
+  background: #1a73e8;
+  color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 5px;
   font-family: 'Kanit', sans-serif;
   font-size: 0.9rem;
   font-weight: 500;
@@ -987,12 +885,11 @@ td {
 }
 
 .view-btn:hover {
-  background: #1e40af;
+  background: #1557b0;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3);
 }
 
-/* Modal Styling */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1008,14 +905,14 @@ td {
 }
 
 .modal-content {
-  background: rgba(249, 250, 251, 0.95);
+  background: rgba(245, 247, 250, 0.95);
   backdrop-filter: blur(10px);
   border-radius: 20px;
   max-width: 540px;
   width: 90%;
   max-height: 85vh;
   overflow-y: auto;
-  box-shadow: 0 12px 50px rgba(0, 0, 0, 0.2), 0 0 25px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 12px 50px rgba(0, 0, 0, 0.2), 0 0 25px rgba(26, 115, 232, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.2);
   animation: modalGlow 0.5s ease-out;
   position: relative;
@@ -1023,8 +920,8 @@ td {
 
 .modal-header {
   padding: 20px 25px;
-  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-  color: #ffffff;
+  background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
+  color: white;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1048,7 +945,7 @@ td {
 .close-btn {
   background: none;
   border: none;
-  color: #ffffff;
+  color: white;
   font-size: 1.6rem;
   cursor: pointer;
   transition: transform 0.3s, opacity 0.3s;
@@ -1073,13 +970,13 @@ td {
 
 .detail-section:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.1);
 }
 
 .detail-section h4 {
   font-size: 1.2rem;
   font-weight: 600;
-  color: #2563eb;
+  color: #1a73e8;
   margin-bottom: 15px;
   display: flex;
   align-items: center;
@@ -1107,12 +1004,12 @@ td {
 .detail-item p {
   font-size: 1rem;
   font-weight: 400;
-  color: #6b7280;
+  color: #666;
   line-height: 1.5;
 }
 
 .detail-item p.highlight {
-  color: #2563eb;
+  color: #1a73e8;
 }
 
 .modal-footer {
@@ -1124,31 +1021,11 @@ td {
   position: sticky;
   bottom: 0;
   z-index: 10;
-  display: flex;
-  justify-content: space-between;
 }
 
 .modal-close-btn {
   padding: 12px 30px;
-  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-  color: #ffffff;
-  border: none;
-  border-radius: 10px;
-  font-family: 'Kanit', sans-serif;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.modal-close-btn2 {
-  padding: 12px 30px;
-  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
   color: white;
   border: none;
   border-radius: 10px;
@@ -1166,7 +1043,7 @@ td {
 
 .modal-close-btn:hover {
   transform: scale(1.05);
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 6px 20px rgba(26, 115, 232, 0.4);
 }
 
 .modal-close-btn::before {
@@ -1188,86 +1065,6 @@ td {
   animation: ripple 0.6s ease-out;
 }
 
-.modal-close-btn2:hover {
-  transform: scale(1.05);
-  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
-}
-
-.modal-close-btn2::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  transition: width 0.6s ease, height 0.6s ease;
-}
-
-.modal-close-btn2:active::before {
-  width: 200px;
-  height: 200px;
-  animation: ripple 0.6s ease-out;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .profile-header {
-    flex-direction: column;
-    gap: 15px;
-  }
-
-  .back-btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .info-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .edit-actions {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  th,
-  td {
-    padding: 8px;
-    font-size: 0.95rem;
-  }
-
-  .view-btn {
-    padding: 6px 10px;
-    font-size: 0.85rem;
-  }
-
-  .modal-content {
-    width: 95%;
-    max-height: 90vh;
-  }
-
-  .modal-header h3 {
-    font-size: 1.4rem;
-  }
-
-  .detail-section h4 {
-    font-size: 1.15rem;
-  }
-
-  .detail-item label,
-  .detail-item p {
-    font-size: 0.95rem;
-  }
-
-  .modal-close-btn {
-    padding: 10px 25px;
-  }
-}
-
-/* Notification Styling */
 .notification {
   position: fixed;
   top: 20px;
@@ -1290,11 +1087,6 @@ td {
 
 .notification.error {
   background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-  color: white;
-}
-
-.notification.warning {
-  background: linear-gradient(135deg, #f39c12 0%, #d35400 100%);
   color: white;
 }
 
@@ -1342,138 +1134,66 @@ td {
   }
 }
 
-/* Confirm Modal Styling */
-.confirm-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2000;
-  animation: modalFade 0.3s ease-out;
-}
-
-.confirm-modal-content {
-  background: white;
-  border-radius: 10px;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  animation: modalGlow 0.5s ease-out;
-}
-
-.confirm-modal-header {
-  padding: 15px 20px;
-  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-  color: white;
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
-}
-
-.confirm-modal-header h3 {
-  margin: 0;
-  font-size: 1.2rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.confirm-modal-body {
-  padding: 20px;
-  text-align: center;
-}
-
-.confirm-modal-body p {
-  font-size: 1rem;
-  font-weight: 400;
-  color: #333;
-  margin: 0 0 10px;
-}
-
-.confirm-modal-body p.highlight {
-  font-weight: 500;
-  color: #2563eb;
-}
-
-.confirm-modal-footer {
-  padding: 15px 20px;
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  border-bottom-left-radius: 10px;
-  border-bottom-right-radius: 10px;
-}
-
-.confirm-btn {
-  padding: 10px 20px;
-  background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
-  color: white;
-  border: none;
-  border-radius: 5px;
-  font-family: 'Kanit', sans-serif;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.confirm-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
-}
-
-.cancel-btn {
-  padding: 10px 20px;
-  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-  color: white;
-  border: none;
-  border-radius: 5px;
-  font-family: 'Kanit', sans-serif;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.cancel-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
-}
-
-/* Responsive Design for Notification and Confirm Modal */
 @media (max-width: 768px) {
-  .notification {
-    width: 90%;
-    right: 5%;
+  .profile-header {
+    flex-direction: column;
+    gap: 15px;
   }
 
-  .confirm-modal-content {
-    width: 95%;
+  .back-btn {
+    width: 100%;
+    justify-content: center;
   }
 
-  .confirm-modal-header h3 {
-    font-size: 1.1rem;
+  .info-grid {
+    grid-template-columns: 1fr;
   }
 
-  .confirm-modal-body p {
+  .edit-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .profile-section {
+    padding: 15px;
+  }
+
+  th,
+  td {
+    padding: 10px;
     font-size: 0.95rem;
   }
 
-  .confirm-btn,
-  .cancel-btn {
-    padding: 8px 15px;
-    font-size: 0.9rem;
+  .view-btn {
+    padding: 6px 10px;
+    font-size: 0.85rem;
+  }
+
+  .modal-content {
+    width: 95%;
+    max-height: 90vh;
+  }
+
+  .modal-header h3 {
+    font-size: 1.4rem;
+  }
+
+  .detail-section h4 {
+    font-size: 1.15rem;
+  }
+
+  .detail-item label,
+  .detail-item p {
+    font-size: 0.95rem;
+  }
+
+  .modal-close-btn {
+    padding: 10px 25px;
+  }
+
+  .notification {
+    width: 90%;
+    right: 5%;
   }
 }
 </style>

@@ -7,6 +7,14 @@ const fs = require('fs').promises;
 const path = require('path');
 const fontkit = require('@pdf-lib/fontkit');
 
+// Middleware เพื่อตรวจสอบว่าเป็น instructor
+const ensureInstructor = (req, res, next) => {
+  if (req.user && req.user.role === 'instructor') {
+    return next();
+  }
+  res.status(403).json({ message: 'เฉพาะอาจารย์ประจำวิชาเท่านั้น' });
+};
+
 // GET all draft forms for a user
 router.get('/drafts/:userId', async (req, res) => {
   try {
@@ -31,19 +39,11 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET add seat requests by email or userId
-router.get('/addseatrequests', async (req, res) => {
+// GET add seat requests for instructors
+router.get('/addseatrequests', ensureInstructor, async (req, res) => {
   try {
-    const { email, userId } = req.query;
-    const query = {};
-    if (email) query.email = email;
-    if (userId) query.userId = userId;
-
-    if (!email && !userId) {
-      return res.status(400).json({ message: 'ต้องระบุ email หรือ userId' });
-    }
-
-    const requests = await AddSeatRequest.find(query);
+    // คืนคำร้องทั้งหมดที่มีสถานะ submitted สำหรับอาจารย์
+    const requests = await AddSeatRequest.find({ status: 'submitted' }).select('-__v');
     res.json(requests);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -208,39 +208,52 @@ router.get('/:id/pdf', async (req, res) => {
     const { height } = page.getSize();
 
     // ฟังก์ชันสำหรับเขียนข้อความ
-    const drawText = (text, x, y, size = 16) => {
-      page.drawText(text, {
-        x,
-        y: height - y,
-        size,
-        font: thaiFont,
-        color: require('pdf-lib').rgb(0, 0, 0),
-      });
-    };
+   // ฟังก์ชันสำหรับเขียนข้อความ
+const drawText = (text, x, y, size = 16, maxWidth = Infinity) => {
+  // ถ้าข้อความยาวเกิน maxWidth ให้ตัดข้อความ
+  let displayText = text;
+  let currentWidth = thaiFont.widthOfTextAtSize(text, size);
+
+  if (currentWidth > maxWidth) {
+    let truncatedText = text;
+    while (thaiFont.widthOfTextAtSize(truncatedText + '...', size) > maxWidth && truncatedText.length > 0) {
+      truncatedText = truncatedText.slice(0, -1);
+    }
+    displayText = truncatedText + '...';
+  }
+
+  page.drawText(displayText, {
+    x,
+    y,
+    size,
+    font: thaiFont,
+    color: require('pdf-lib').rgb(0, 0, 0),
+  });
+};
 
     // กรอกข้อมูลลงใน PDF
-    drawText(request.semester, 430, 115); // ภาคการศึกษา
-    drawText(request.academicYear, 500, 115); // ปีการศึกษา
-    drawText(request.date, 170, 140); // วันที่
-    drawText(request.month, 230, 140); // เดือน
-    drawText(request.year, 340, 140); // ปี
-    drawText(request.lecturer, 170, 165); // เรียน
-    drawText(request.studentName, 170, 210); // ชื่อ-นามสกุล
-    drawText(request.studentId, 450, 210); // รหัสนักศึกษา
+    drawText(request.semester, 344.00, 773.43); // ภาคการศึกษา
+    drawText(request.academicYear, 436.80, 773.43); // ปีการศึกษา
+    drawText(request.date, 391.20, 736.43); // วันที่
+    drawText(request.month,443.52, 736.43); // เดือน
+    drawText(request.year, 517.76, 736.43); // ปี
+    drawText(request.lecturer, 183.04, 706.60); // เรียน
+    drawText(request.studentName, 206.72, 673.96); // ชื่อ-นามสกุล
+    drawText(request.studentId, 474.88, 673.96); // รหัสนักศึกษา
     drawText(request.levelOfStudy, 170, 235); // ระดับการศึกษา
-    drawText(request.faculty, 170, 260); // คณะ
-    drawText(request.fieldOfStudy, 170, 285); // สาขาวิชา
-    drawText(request.classLevel, 450, 285); // ชั้นปี
-    drawText(request.courseCode, 110, 340); // รหัสวิชา
-    drawText(request.courseTitle, 200, 340); // ชื่อวิชา
-    drawText(request.section, 400, 340); // ตอนเรียน
-    drawText(request.credits, 450, 340); // หน่วยกิต
-    drawText(request.day, 480, 340); // วัน
-    drawText(request.time, 510, 340); // เวลา
-    drawText(request.room, 550, 340); // ห้อง
-    drawText(request.contactNumber, 170, 400); // เบอร์โทร
-    drawText(request.email, 350, 400); // อีเมล
-    drawText(request.signature, 170, 450); // ลงชื่อ
+    drawText(request.faculty, 132.48, 619.56); // คณะ
+    drawText(request.fieldOfStudy, 353.28, 619.56); // สาขาวิชา
+    drawText(request.classLevel, 527.48, 619.56); // ชั้นปี
+    drawText(request.courseCode, 53.12, 462.40); // รหัสวิชา
+    drawText(request.courseTitle, 157.44, 462.40, 14, 250); // ชื่อวิชา
+    drawText(request.section, 342.40, 462.40); // กลุ่มเรียน
+    // drawText(request.credits, 450, 340); // หน่วยกิต
+    drawText(request.day, 387.84, 462.40); // ยอดลงทะเบียน
+    // drawText(request.time, 510, 340); // เวลา
+    // drawText(request.room, 550, 340); // ห้อง
+    drawText(request.contactNumber, 106.88, 332.20); // เบอร์โทร
+    drawText(request.email, 106.88, 314.28); // อีเมล
+    drawText(request.signature, 389.76, 340.52); // ลงชื่อ
 
     // บันทึก PDF
     const pdfBytesModified = await pdfDoc.save();
@@ -256,5 +269,6 @@ router.get('/:id/pdf', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 
 module.exports = router;

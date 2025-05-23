@@ -78,6 +78,10 @@ export default {
     const userData = localStorage.getItem('user');
     if (userData) {
       this.user = JSON.parse(userData);
+      if (this.user.role !== 'instructor') {
+        this.$router.push('/login');
+        return;
+      }
       this.fetchRequests();
     } else {
       this.$router.push('/login');
@@ -87,8 +91,8 @@ export default {
     async fetchRequests() {
       this.isLoading = true;
       try {
-        const response = await axios.get(`/api/addseatrequests/addseatrequests?email=${this.user.email}`);
-        this.requests = response.data.filter(req => req.status === 'submitted');
+        const response = await axios.get('/api/addseatrequests/addseatrequests');
+        this.requests = response.data;
       } catch (error) {
         console.error('Error fetching requests:', error);
         this.errorMessage = error.response?.data?.message || 'เกิดข้อผิดพลาดในการโหลดคำร้อง';

@@ -2,6 +2,14 @@ const express = require('express');
 const router = express.Router();
 const Subject = require('../models/subject');
 
+// Middleware เพื่อตรวจสอบว่าเป็น admin
+const ensureAdmin = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    return next();
+  }
+  res.status(403).json({ message: 'เฉพาะผู้ดูแลระบบเท่านั้น' });
+};
+
 // GET all subjects
 router.get('/', async (req, res) => {
   try {
@@ -24,7 +32,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST create new subject
-router.post('/', async (req, res) => {
+router.post('/', ensureAdmin, async (req, res) => {
   const subject = new Subject({
     subjectCode: req.body.subjectCode,
     subjectNameEN: req.body.subjectNameEN,
@@ -42,7 +50,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT update subject
-router.put('/:id', async (req, res) => {
+router.put('/:id', ensureAdmin, async (req, res) => {
   try {
     const subject = await Subject.findById(req.params.id);
     if (!subject) return res.status(404).json({ message: 'ไม่พบรายวิชา' });
@@ -61,13 +69,26 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE subject
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', ensureAdmin, async (req, res) => {
   try {
     const subject = await Subject.findById(req.params.id);
     if (!subject) return res.status(404).json({ message: 'ไม่พบรายวิชา' });
 
     await subject.deleteOne();
     res.json({ message: 'ลบรายวิชาเรียบร้อยแล้ว' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// CHECK if subjectCode exists
+router.get('/check/:subjectCode', ensureAdmin, async (req, res) => {
+  try {
+    const subject = await Subject.findOne({ subjectCode: req.params.subjectCode });
+    if (subject) {
+      return res.json({ exists: true });
+    }
+    res.json({ exists: false });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
